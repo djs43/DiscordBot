@@ -3,3 +3,6 @@ config.json
 
 #ignore Mp3 files
 *.mp3
+
+# Node.js dependencies
+node_modules/

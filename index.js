@@ -1,6 +1,8 @@
 const { Client, Events, GatewayIntentBits, SlashCommandBuilder } = require("discord.js");
 const { token } = require("./config.json");
 const { joinVoiceChannel, createAudioPlayer, createAudioResource } = require('@discordjs/voice');
+const ytdl = require('ytdl-core');
+const path = require('path');
 
 const client = new Client({
     intents: [
@@ -25,15 +27,22 @@ client.once(Events.ClientReady, async c => {
             .setDescription('Says hello to someone!'),
         new SlashCommandBuilder()
             .setName('play')
-            .setDescription('Plays a music file')
+            .setDescription('Plays a YouTube video')
+            .addStringOption(option =>
+                option.setName('url')
+                    .setDescription('The YouTube video URL to play')
+                    .setRequired(true)),
+        new SlashCommandBuilder()
+            .setName('playlocal')
+            .setDescription('Plays a local audio file')
             .addStringOption(option =>
                 option.setName('file')
-                    .setDescription('The audio file to play')
+                    .setDescription('The path to the local audio file')
                     .setRequired(true))
     ].map(command => command.toJSON());
 
     try {
-        await client.application.commands.set(commands, "929092597505462362");
+        await client.application.commands.set(commands);
         console.log('Commands registered successfully.');
     } catch (error) {
         console.error('Error registering commands:', error);
@@ -65,14 +74,45 @@ client.on(Events.InteractionCreate, async interaction => {
             adapterCreator: interaction.guild.voiceAdapterCreator,
         });
 
-        const audioFile = interaction.options.getString('file');
+        const url = interaction.options.getString('url');
         const player = createAudioPlayer();
-        const resource = createAudioResource(audioFile); // Make sure the file is accessible
+
+        // Create a stream from the YouTube video
+        const resource = createAudioResource(ytdl(url, { filter: 'audioonly' }));
 
         player.play(resource);
         connection.subscribe(player);
 
-        await interaction.reply(`Now playing: ${audioFile}`);
+        await interaction.reply(`Now playing: ${url}`);
+
+        player.on('idle', () => {
+            connection.destroy();
+            console.log('Left the voice channel.');
+        });
+    }
+    else if (interaction.commandName === "playlocal") {
+        const voiceChannel = interaction.member.voice.channel;
+
+        if (!voiceChannel) {
+            return interaction.reply('You need to be in a voice channel to play music!');
+        }
+
+        const connection = joinVoiceChannel({
+            channelId: voiceChannel.id,
+            guildId: interaction.guild.id,
+            adapterCreator: interaction.guild.voiceAdapterCreator,
+        });
+
+        const filePath = interaction.options.getString('file');
+        const player = createAudioPlayer();
+
+        // Resolve the path to the local audio file
+        const resource = createAudioResource(path.resolve(filePath));
+
+        player.play(resource);
+        connection.subscribe(player);
+
+        await interaction.reply(`Now playing local file: ${filePath}`);
 
         player.on('idle', () => {
             connection.destroy();
