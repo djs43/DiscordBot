@@ -1,2 +1,5 @@
 #Contains Secret Token
 config.json
+
+#ignore Mp3 files
+*.mp3
