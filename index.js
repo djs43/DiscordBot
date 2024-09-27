@@ -1,6 +1,6 @@
 const { Client, Events, GatewayIntentBits, SlashCommandBuilder } = require("discord.js");
 const { token } = require("./config.json");
-const { joinVoiceChannel, createAudioPlayer, createAudioResource } = require('@discordjs/voice');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
 const ytdl = require('ytdl-core');
 const path = require('path');
 
@@ -11,6 +11,9 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
     ]
 });
+
+// Store the audio player for each guild
+const audioPlayers = {};
 
 client.once(Events.ClientReady, async c => {
     console.log(`Logged in as ${c.user.tag}`);
@@ -38,7 +41,10 @@ client.once(Events.ClientReady, async c => {
             .addStringOption(option =>
                 option.setName('file')
                     .setDescription('The path to the local audio file')
-                    .setRequired(true))
+                    .setRequired(true)),
+        new SlashCommandBuilder()
+            .setName('stop')
+            .setDescription('Stops the current audio and leaves the voice channel')
     ].map(command => command.toJSON());
 
     try {
@@ -52,6 +58,8 @@ client.once(Events.ClientReady, async c => {
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
+    const voiceChannel = interaction.member.voice.channel;
+
     if (interaction.commandName === "ping") {
         await interaction.reply("Pong!");
     }
@@ -62,8 +70,6 @@ client.on(Events.InteractionCreate, async interaction => {
         await interaction.reply(`¡Hola ${interaction.user.username}!`);
     }
     else if (interaction.commandName === "play") {
-        const voiceChannel = interaction.member.voice.channel;
-
         if (!voiceChannel) {
             return interaction.reply('You need to be in a voice channel to play music!');
         }
@@ -77,6 +83,9 @@ client.on(Events.InteractionCreate, async interaction => {
         const url = interaction.options.getString('url');
         const player = createAudioPlayer();
 
+        // Store the player for the current guild
+        audioPlayers[interaction.guild.id] = player;
+
         // Create a stream from the YouTube video
         const resource = createAudioResource(ytdl(url, { filter: 'audioonly' }));
 
@@ -87,12 +96,11 @@ client.on(Events.InteractionCreate, async interaction => {
 
         player.on('idle', () => {
             connection.destroy();
+            delete audioPlayers[interaction.guild.id]; // Remove player reference
             console.log('Left the voice channel.');
         });
     }
     else if (interaction.commandName === "playlocal") {
-        const voiceChannel = interaction.member.voice.channel;
-
         if (!voiceChannel) {
             return interaction.reply('You need to be in a voice channel to play music!');
         }
@@ -106,6 +114,9 @@ client.on(Events.InteractionCreate, async interaction => {
         const filePath = interaction.options.getString('file');
         const player = createAudioPlayer();
 
+        // Store the player for the current guild
+        audioPlayers[interaction.guild.id] = player;
+
         // Resolve the path to the local audio file
         const resource = createAudioResource(path.resolve(filePath));
 
@@ -116,8 +127,29 @@ client.on(Events.InteractionCreate, async interaction => {
 
         player.on('idle', () => {
             connection.destroy();
+            delete audioPlayers[interaction.guild.id]; // Remove player reference
             console.log('Left the voice channel.');
         });
+    }
+    else if (interaction.commandName === "stop") {
+        if (!voiceChannel) {
+            return interaction.reply('You need to be in a voice channel to stop the music!');
+        }
+
+        const player = audioPlayers[interaction.guild.id];
+        if (player) {
+            player.stop();
+            interaction.reply('Stopped the music and left the voice channel.');
+
+            // Destroy the connection
+            const connection = getVoiceConnection(interaction.guild.id);
+            if (connection) {
+                connection.destroy();
+            }
+            delete audioPlayers[interaction.guild.id]; // Remove player reference
+        } else {
+            await interaction.reply('No music is currently playing.');
+        }
     }
 
     console.log(interaction);
