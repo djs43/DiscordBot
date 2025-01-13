@@ -1,3 +1,4 @@
+const si = require('systeminformation');
 const { Client, Events, GatewayIntentBits, SlashCommandBuilder } = require("discord.js");
 const { token } = require("./config.json");
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
@@ -20,20 +21,21 @@ client.once(Events.ClientReady, async () => {
     console.log(`Logged in as ${client.user.tag}`);
 
     // Update bot status every minute
-    setInterval(() => {
-        // Calculate CPU usage
-        const cpuUsage = os.cpus().map(cpu => cpu.times.user).reduce((total, userTime) => total + userTime, 0) / os.cpus().length;
-        
-        // Calculate RAM usage
+    setInterval(async () => {
+        // Get CPU usage using systeminformation
+        const cpuData = await si.currentLoad();
+        const cpuUsage = cpuData.currentLoad.toFixed(2); // Get CPU load as a percentage
+
+        // Get RAM usage
         const ramUsage = (os.totalmem() - os.freemem()) / os.totalmem() * 100;
 
-        // Format status message
-        const statusMessage = `CPU: ${cpuUsage.toFixed(2)}% | RAM: ${ramUsage.toFixed(2)}%`;
+        // Format the status message
+        const statusMessage = `CPU: ${cpuUsage}% | RAM: ${ramUsage.toFixed(2)}%`;
 
-        // Set the bot's presence (status)
+        // Update the bot's presence (status)
         client.user.setPresence({ activities: [{ name: statusMessage }] });
         console.log('Bot status updated:', statusMessage); // Log the status for debugging
-    }, 3000);  // Update the status every 60 seconds (60000 ms)
+    }, 3000);  // Update the status every 3 seconds (3000 ms)
 
     const commands = [
         new SlashCommandBuilder()
