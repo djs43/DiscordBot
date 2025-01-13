@@ -3,6 +3,7 @@ const { token } = require("./config.json");
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
 const ytdl = require('ytdl-core');
 const path = require('path');
+const os = require('os');  // To get system stats (CPU and RAM)
 
 const client = new Client({
     intents: [
@@ -15,8 +16,24 @@ const client = new Client({
 // Store the audio player for each guild
 const audioPlayers = {};
 
-client.once(Events.ClientReady, async c => {
-    console.log(`Logged in as ${c.user.tag}`);
+client.once(Events.ClientReady, async () => {
+    console.log(`Logged in as ${client.user.tag}`);
+
+    // Update bot status every minute
+    setInterval(() => {
+        // Calculate CPU usage
+        const cpuUsage = os.cpus().map(cpu => cpu.times.user).reduce((total, userTime) => total + userTime, 0) / os.cpus().length;
+        
+        // Calculate RAM usage
+        const ramUsage = (os.totalmem() - os.freemem()) / os.totalmem() * 100;
+
+        // Format status message
+        const statusMessage = `CPU: ${cpuUsage.toFixed(2)}% | RAM: ${ramUsage.toFixed(2)}%`;
+
+        // Set the bot's presence (status)
+        client.user.setPresence({ activities: [{ name: statusMessage }] });
+        console.log('Bot status updated:', statusMessage); // Log the status for debugging
+    }, 3000);  // Update the status every 60 seconds (60000 ms)
 
     const commands = [
         new SlashCommandBuilder()
