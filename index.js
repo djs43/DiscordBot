@@ -105,10 +105,10 @@ client.on(Events.InteractionCreate, async interaction => {
     const voiceChannel = interaction.member.voice.channel;
 
     // Handle /start command for starting servers
-    if (interaction.commandName === "start") {
+    if (interaction.commandName === "launch") {
         const serverType = interaction.options.getString('server'); // Get the server type from the command options
 
-        if (serverType === 'arma3') {
+        if (serverType === 'arma') {
             StartServer(interaction);
         }
         // Add conditions here for other server types in the future (e.g., 'minecraft', 'csgo')
@@ -118,7 +118,7 @@ client.on(Events.InteractionCreate, async interaction => {
     else if (interaction.commandName === "stop") {
         const serverType = interaction.options.getString('server'); // Get the server type from the command options
 
-        if (serverType === 'arma3') {
+        if (serverType === 'arma') {
             StopServer(interaction);
         }
         // Add conditions here for stopping other server types in the future
