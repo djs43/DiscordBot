@@ -1,18 +1,17 @@
 const { exec } = require('child_process');
-const { token, arma3server } = require("./config.json"); // Import config.json
+const { arma3server } = require("./config.json"); // Import config.json
 
 // Store the PIDs of active servers in memory
 let activeServers = {};
 
 // Function to start the server
 async function StartServer() {
-    // Logic for starting a server (e.g., Arma 3)
     console.log('Starting server...');
 
     const isServerRunning = await checkIfServerRunning();
     if (isServerRunning) {
         console.log('Server is already running.');
-        return;
+        return 'Server is already running.';
     }
 
     const batFilePath = `"${arma3server.batFilePath}"`; // Wrap the path in quotes to handle spaces
@@ -21,11 +20,13 @@ async function StartServer() {
     const serverProcess = exec(batFilePath, (error, stdout, stderr) => {
         if (error) {
             console.error(`Error: ${stderr}`);
-            return;
+            return 'Error starting the server.';
         }
         console.log(`Server started: ${stdout}`);
         activeServers[serverProcess.pid] = { status: 'running' };
     });
+
+    return 'Server started successfully.';
 }
 
 // Helper function to check all running instances of arma3server_x64.exe and get their PIDs
@@ -38,14 +39,11 @@ async function getRunningServers() {
                 reject(error);
             }
 
-            // Parse the CSV output to get all running instances' PIDs
             const lines = stdout.trim().split('\n');
             if (lines.length > 0) {
-                // Map each line and ensure that the correct data is available before processing
                 const servers = lines.map(line => {
                     const serverInfo = line.split(',');
 
-                    // Ensure that the serverInfo array has at least two elements (the first is the process name, the second is the PID)
                     if (serverInfo.length > 1) {
                         const pid = serverInfo[1].replace(/"/g, '').trim();
                         const name = serverInfo[0].replace(/"/g, '').trim();
@@ -65,7 +63,6 @@ async function getRunningServers() {
 // Function to stop all running servers
 async function StopServer() {
     try {
-        // Get all running server PIDs
         const runningServers = await getRunningServers();
 
         if (runningServers.length === 0) {
@@ -73,7 +70,6 @@ async function StopServer() {
             return "No active servers to stop.";
         }
 
-        // Iterate over all PIDs and kill each server
         const killedPIDs = [];
         for (let server of runningServers) {
             const killCommand = `taskkill /F /PID ${server.pid}`;
@@ -87,7 +83,6 @@ async function StopServer() {
             });
         }
 
-        // Inform the user about the PIDs of killed servers
         if (killedPIDs.length > 0) {
             console.log(`The following servers have been killed: ${killedPIDs.join(', ')}`);
             return `The following servers have been killed: ${killedPIDs.join(', ')}`;
@@ -111,7 +106,7 @@ async function showActiveServers() {
             runningServers.forEach(server => {
                 console.log(`PID: ${server.pid}, Name: ${server.name}`);
             });
-            return runningServers;
+            return runningServers.map(server => `PID: ${server.pid}, Name: ${server.name}`).join('\n');
         } else {
             console.log("No active servers.");
             return "No active servers.";
@@ -127,33 +122,23 @@ async function checkIfServerRunning() {
     return new Promise((resolve, reject) => {
         console.log("Checking if server is running...");
 
-        // Run tasklist command to check if 'arma3server_x64.exe' is running
         exec('tasklist /FI "IMAGENAME eq arma3server_x64.exe" /FO CSV /NH', (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error checking server status: ${stderr}`);
                 reject(error);
             }
 
-            // Split the output into lines
             const lines = stdout.trim().split('\n');
-
-            // If there is no output or the output is not valid, the server is not running
             if (lines.length === 0 || lines[0].trim() === '') {
                 console.log('No running servers found.');
                 resolve(false);
                 return;
             }
 
-            // If there's output, parse it to get the PID and name of the server
             const serverInfo = lines[0].split(',');
-
-            // Ensure the expected fields are available
             if (serverInfo.length >= 2) {
-                // Extract and clean the PID and name
                 const pid = serverInfo[1].replace(/"/g, '').trim();
                 const name = serverInfo[0].replace(/"/g, '').trim();
-
-                // Log the server's PID and name
                 console.log(`Server is running. PID: ${pid}, Name: ${name}`);
                 resolve(true);
             } else {

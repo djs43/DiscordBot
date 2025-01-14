@@ -49,16 +49,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
     // Example command handlers (can be moved to separate functions)
-    if (interaction.commandName === "start") {
-        await StartServer(interaction); // Call StartServer from serverFunctions.js
+     // Start server
+     if (interaction.commandName === "start") {
+        const serverType = interaction.options.getString("server"); // Get the server type argument
+        if (serverType === "arma3") {
+            const result = await StartServer();  // Call StartServer from serverFunctions.js
+            await interaction.reply(result);  // Send the result back to Discord
+        }
     }
 
+    // Stop server
     if (interaction.commandName === "stop") {
-        await StopServer(interaction); // Call StopServer from serverFunctions.js
+        const serverType = interaction.options.getString("server"); // Get the server type argument
+        if (serverType === "arma3") {
+            const result = await StopServer();  // Call StopServer from serverFunctions.js
+            await interaction.reply(result);  // Send the result back to Discord
+        }
     }
 
+    // Show active servers
     if (interaction.commandName === "showactive") {
-        await showActiveServers(interaction); // Call showActiveServers from serverFunctions.js
+        const result = await showActiveServers();  // Call showActiveServers from serverFunctions.js
+        await interaction.reply(result);  // Send the result back to Discord
     }
 
     if (interaction.commandName === "play") {
