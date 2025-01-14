@@ -4,11 +4,12 @@ const { token, arma3server } = require("./config.json"); // Import config.json
 // Store the PIDs of active servers in memory
 let activeServers = {};
 
+// Function to start the server
 async function StartServer() {
     // Logic for starting a server (e.g., Arma 3)
     console.log('Starting server...');
+
     const isServerRunning = await checkIfServerRunning();
-    console.log("PreCheck");
     if (isServerRunning) {
         console.log('Server is already running.');
         return;
@@ -16,6 +17,7 @@ async function StartServer() {
 
     const batFilePath = `"${arma3server.batFilePath}"`; // Wrap the path in quotes to handle spaces
     console.log(batFilePath);
+
     const serverProcess = exec(batFilePath, (error, stdout, stderr) => {
         if (error) {
             console.error(`Error: ${stderr}`);
@@ -40,17 +42,19 @@ async function getRunningServers() {
             const lines = stdout.trim().split('\n');
             if (lines.length > 0) {
                 // Map each line and ensure that the correct data is available before processing
-                const serverPIDs = lines.map(line => {
+                const servers = lines.map(line => {
                     const serverInfo = line.split(',');
 
                     // Ensure that the serverInfo array has at least two elements (the first is the process name, the second is the PID)
                     if (serverInfo.length > 1) {
-                        return serverInfo[1].replace(/"/g, ''); // Extract and clean PID
+                        const pid = serverInfo[1].replace(/"/g, '').trim();
+                        const name = serverInfo[0].replace(/"/g, '').trim();
+                        return { pid, name }; // Return both PID and name of each running server
                     }
                     return null; // Return null if data is invalid
-                }).filter(pid => pid !== null); // Remove any invalid entries
+                }).filter(server => server !== null); // Remove any invalid entries
 
-                resolve(serverPIDs);  // Return an array of PIDs
+                resolve(servers);  // Return an array of running server objects
             } else {
                 resolve([]);  // No active servers found
             }
@@ -62,24 +66,24 @@ async function getRunningServers() {
 async function StopServer() {
     try {
         // Get all running server PIDs
-        const serverPIDs = await getRunningServers();
+        const runningServers = await getRunningServers();
 
-        if (serverPIDs.length === 0) {
+        if (runningServers.length === 0) {
             console.log("No active servers to stop.");
             return "No active servers to stop.";
         }
 
         // Iterate over all PIDs and kill each server
         const killedPIDs = [];
-        for (let pid of serverPIDs) {
-            const killCommand = `taskkill /F /PID ${pid}`;
+        for (let server of runningServers) {
+            const killCommand = `taskkill /F /PID ${server.pid}`;
             exec(killCommand, (error, stdout, stderr) => {
                 if (error) {
-                    console.error(`Error stopping server with PID ${pid}: ${stderr}`);
+                    console.error(`Error stopping server with PID ${server.pid}: ${stderr}`);
                     return;
                 }
-                console.log(`Server with PID ${pid} stopped: ${stdout}`);
-                killedPIDs.push(pid);
+                console.log(`Server with PID ${server.pid} stopped: ${stdout}`);
+                killedPIDs.push(server.pid);
             });
         }
 
@@ -94,6 +98,27 @@ async function StopServer() {
     } catch (error) {
         console.error("Error stopping servers:", error);
         return "Error stopping servers.";
+    }
+}
+
+// Function to show active servers with PID
+async function showActiveServers() {
+    try {
+        const runningServers = await getRunningServers();
+
+        if (runningServers.length > 0) {
+            console.log("Active servers:");
+            runningServers.forEach(server => {
+                console.log(`PID: ${server.pid}, Name: ${server.name}`);
+            });
+            return runningServers;
+        } else {
+            console.log("No active servers.");
+            return "No active servers.";
+        }
+    } catch (error) {
+        console.error("Error checking active servers:", error);
+        return "Error checking active servers.";
     }
 }
 
@@ -137,27 +162,6 @@ async function checkIfServerRunning() {
             }
         });
     });
-}
-
-
-
-
-// Function to show active servers with PID
-async function showActiveServers() {
-    try {
-        const serverInfo = await checkIfServerRunning();
-
-        if (serverInfo) {
-            console.log(`Server is running. PID: ${serverInfo.pid}, Name: ${serverInfo.serverName}`);
-            return `Server is running. PID: ${serverInfo.pid}, Name: ${serverInfo.serverName}`;
-        } else {
-            console.log("No active servers.");
-            return "No active servers.";
-        }
-    } catch (error) {
-        console.error("Error checking active servers:", error);
-        return "Error checking active servers.";
-    }
 }
 
 module.exports = { StartServer, StopServer, showActiveServers };
