@@ -6,6 +6,7 @@ const { exec } = require('child_process');
 const si = require('systeminformation');
 const os = require('os');
 const inquirer = require('inquirer');  // Import inquirer for CLI prompts
+const { StartServer, StopServer, showActiveServers } = require("./serverFunctions"); // Import server functions
 
 const client = new Client({
     intents: [
@@ -14,9 +15,6 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
     ]
 });
-
-// Store the PIDs of active servers in memory
-let activeServers = {};
 
 // Register commands on bot startup
 client.once(Events.ClientReady, async () => {
@@ -52,15 +50,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     // Example command handlers (can be moved to separate functions)
     if (interaction.commandName === "start") {
-        await StartServer(interaction);
+        await StartServer(interaction); // Call StartServer from serverFunctions.js
     }
 
     if (interaction.commandName === "stop") {
-        await StopServer(interaction);
+        await StopServer(interaction); // Call StopServer from serverFunctions.js
     }
 
     if (interaction.commandName === "showactive") {
-        await showActiveServers(interaction);
+        await showActiveServers(interaction); // Call showActiveServers from serverFunctions.js
     }
 
     if (interaction.commandName === "play") {
@@ -78,62 +76,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 // Start the bot
 client.login(token);
-
-// Helper functions for server and music commands
-async function StartServer(interaction) {
-    // Logic for starting a server (e.g., Arma 3)
-    console.log("Starting server...");
-    const isServerRunning = await checkIfServerRunning();
-    
-    if (isServerRunning) {
-        console.log('Server is already running.');
-        return interaction.reply('The server is already running!');
-    }
-
-    const batFilePath = "your/server/start/script.bat"; // Replace with your path
-    const serverProcess = exec(batFilePath, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`Error: ${stderr}`);
-            return interaction.reply('Failed to start the server!');
-        }
-        console.log(`Server started: ${stdout}`);
-        const pid = serverProcess.pid;
-        activeServers[pid] = { status: 'running' };
-        interaction.reply(`Server started with PID: ${pid}`);
-    });
-}
-
-async function StopServer(interaction) {
-    // Logic for stopping a server
-    const pid = Object.keys(activeServers)[0];
-    if (!pid) {
-        console.log("No server running.");
-        return interaction.reply("No active server to stop.");
-    }
-
-    const killCommand = `taskkill /F /PID ${pid}`;
-    exec(killCommand, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`Error: ${stderr}`);
-            return interaction.reply("Failed to stop the server!");
-        }
-        console.log(`Server stopped: ${stdout}`);
-        delete activeServers[pid];
-        interaction.reply("Server stopped successfully.");
-    });
-}
-
-async function showActiveServers(interaction) {
-    // Show active servers
-    if (Object.keys(activeServers).length === 0) {
-        return interaction.reply("No active servers.");
-    }
-
-    const activeServerList = Object.keys(activeServers)
-        .map(pid => `PID: ${pid}`)
-        .join('\n');
-    interaction.reply(`Active servers:\n${activeServerList}`);
-}
 
 // CLI Interface using inquirer
 async function cliMenu() {
@@ -172,20 +114,3 @@ async function cliMenu() {
 
 // Start CLI in the terminal
 cliMenu();
-
-async function checkIfServerRunning() {
-    return new Promise((resolve, reject) => {
-        exec('tasklist /FI "IMAGENAME eq arma3server_x64.exe"', (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error checking server status: ${stderr}`);
-                reject(error);
-            }
-
-            if (stdout.includes('arma3server_x64.exe')) {
-                resolve(true);
-            } else {
-                resolve(false);
-            }
-        });
-    });
-}
