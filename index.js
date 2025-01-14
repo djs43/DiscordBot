@@ -15,8 +15,8 @@ const client = new Client({
     ]
 });
 
-// Store the audio player for each guild
-const audioPlayers = {};
+// Store the PIDs of active servers in memory
+let activeServers = {};
 
 client.once(Events.ClientReady, async () => {
     console.log(`Logged in as ${client.user.tag}`);
@@ -128,7 +128,6 @@ client.on(Events.InteractionCreate, async interaction => {
         if (serverType === 'arma3') {
             StopServer(interaction);
         }
-        // Add conditions here for stopping other server types in the future
     }
 
     // Handle other commands
@@ -225,7 +224,7 @@ client.on(Events.InteractionCreate, async interaction => {
 function StartServer(interaction) {
     const batFilePath = arma3server.batFilePath;  // Get the path from config.json
 
-    exec(`"${batFilePath}"`, (error, stdout, stderr) => {
+    const serverProcess = exec(`"${batFilePath}"`, (error, stdout, stderr) => {
         if (error) {
             console.error(`exec error: ${error}`);
             interaction.reply('Failed to start the server. Please check the logs.');
@@ -236,14 +235,25 @@ function StartServer(interaction) {
         }
         console.log(`stdout: ${stdout}`);
 
+        // Store the PID of the started server process in memory
+        const pid = serverProcess.pid;
+        activeServers[pid] = { status: 'running' };
+
         // Notify the user that the server has been started
-        interaction.reply('Server has been started successfully!');
+        interaction.reply(`Server has been started successfully with PID: ${pid}`);
     });
 }
 
 // Function to stop a game server (e.g., Arma 3)
 function StopServer(interaction) {
-    const killCommand = 'taskkill /F /IM arma3server_x64.exe'; // Kill the running arma3server_x64.exe process
+    // Find the PID from activeServers (example assumes the first PID in memory)
+    const pid = Object.keys(activeServers)[0];
+    
+    if (!pid) {
+        return interaction.reply('No server is currently running.');
+    }
+
+    const killCommand = `taskkill /F /PID ${pid}`; // Kill the running arma3server_x64.exe process
 
     exec(killCommand, (error, stdout, stderr) => {
         if (error) {
@@ -256,8 +266,37 @@ function StopServer(interaction) {
         }
         console.log(`stdout: ${stdout}`);
 
+        // Remove the server from activeServers
+        delete activeServers[pid];
+
         // Notify the user that the server has been stopped
         interaction.reply('Server has been stopped successfully!');
+    });
+}
+
+// Function to check if the server is still running
+function checkServerStatus(interaction) {
+    // Get the PID of the first server (example assumes only one server running)
+    const pid = Object.keys(activeServers)[0];
+
+    if (!pid || !activeServers[pid]) {
+        interaction.reply('No server is currently running.');
+        return;
+    }
+
+    exec(`tasklist /fi "PID eq ${pid}"`, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error checking server status: ${stderr}`);
+            interaction.reply('Error checking server status.');
+            return;
+        }
+
+        if (stdout.includes(pid)) {
+            interaction.reply(`Server with PID ${pid} is still running.`);
+        } else {
+            interaction.reply(`Server with PID ${pid} is not running.`);
+            activeServers[pid] = { status: 'stopped' };  // Optionally, update status in memory
+        }
     });
 }
 
