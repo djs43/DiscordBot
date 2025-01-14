@@ -1,11 +1,11 @@
-const si = require('systeminformation');
-const { Client, Events, GatewayIntentBits, SlashCommandBuilder } = require("discord.js");
-const { token, arma3server } = require("./config.json");
+const { Client, Events, GatewayIntentBits } = require("discord.js");
+const { token } = require("./config.json");
+const { registerCommands } = require("./commands"); // Separate commands module for better structure
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
-const ytdl = require('ytdl-core');
-const path = require('path');
-const os = require('os');
 const { exec } = require('child_process');
+const si = require('systeminformation');
+const os = require('os');
+const inquirer = require('inquirer');  // Import inquirer for CLI prompts
 
 const client = new Client({
     intents: [
@@ -18,299 +18,162 @@ const client = new Client({
 // Store the PIDs of active servers in memory
 let activeServers = {};
 
+// Register commands on bot startup
 client.once(Events.ClientReady, async () => {
     console.log(`Logged in as ${client.user.tag}`);
 
-    // Update bot status every 3 seconds
-    setInterval(async () => {
-        // Get CPU usage using systeminformation
-        const cpuData = await si.currentLoad();
-        const cpuUsage = cpuData.currentLoad.toFixed(2); // Get CPU load as a percentage
+    // Register commands in the server (this ensures commands are always up to date)
+    try {
+        await registerCommands(client);
+        console.log("Commands registered successfully.");
+    } catch (error) {
+        console.error("Error registering commands:", error);
+    }
 
-        // Get RAM usage
+    // Update bot status periodically
+    setInterval(async () => {
+        const cpuData = await si.currentLoad();
+        const cpuUsage = cpuData.currentLoad.toFixed(2);
         const ramUsage = (os.totalmem() - os.freemem()) / os.totalmem() * 100;
 
-        // Format the status message
         const statusMessage = `CPU: ${cpuUsage}% | RAM: ${ramUsage.toFixed(2)}%`;
-
-        // Update the bot's presence (status)
         client.user.setPresence({ activities: [{ name: statusMessage }] });
-        //console.log(`Bot status updated: ${statusMessage}`);
-    }, 3000);  // Update the status every 3 seconds
-
-    try {
-        // Fetch existing commands to check for duplicates
-        const existingCommands = await client.application.commands.fetch();
-        console.log('Existing commands fetched:', existingCommands);
-
-        const commands = [
-            new SlashCommandBuilder()
-                .setName('ping')
-                .setDescription('Replies with pong'),
-            new SlashCommandBuilder()
-                .setName('start')
-                .setDescription('Starts a game server')
-                .addStringOption(option =>
-                    option.setName('server')
-                        .setDescription('The type of server to start')
-                        .setRequired(true)
-                        .addChoices(
-                            { name: 'Arma 3', value: 'arma3' },
-                        )
-                ),
-            new SlashCommandBuilder()
-                .setName('stop')
-                .setDescription('Stops a game server')
-                .addStringOption(option =>
-                    option.setName('server')
-                        .setDescription('The type of server to stop')
-                        .setRequired(true)
-                        .addChoices(
-                            { name: 'Arma 3', value: 'arma3' },
-                        )
-                ),
-            new SlashCommandBuilder()
-                .setName('showactive')
-                .setDescription('Shows the active game servers and their PIDs'),
-            new SlashCommandBuilder()
-                .setName('play')
-                .setDescription('Plays a YouTube video')
-                .addStringOption(option =>
-                    option.setName('url')
-                        .setDescription('The YouTube video URL to play')
-                        .setRequired(true)),
-            new SlashCommandBuilder()
-                .setName('playlocal')
-                .setDescription('Plays a local audio file')
-                .addStringOption(option =>
-                    option.setName('file')
-                        .setDescription('The path to the local audio file')
-                        .setRequired(true)),
-            new SlashCommandBuilder()
-                .setName('stopsound')
-                .setDescription('Stops the current audio and leaves the voice channel')
-        ].map(command => command.toJSON());
-
-        // Filter out commands that already exist
-        const commandsToRegister = commands.filter(command => {
-            return !existingCommands.some(existingCommand => existingCommand.name === command.name);
-        });
-
-        if (commandsToRegister.length > 0) {
-            await client.application.commands.set(commandsToRegister);
-            console.log('New commands registered:', commandsToRegister);
-        } else {
-            console.log('No new commands to register (no duplicates).');
-        }
-
-    } catch (error) {
-        console.error('Error registering commands:', error);
-    }
+    }, 3000); // Update every 3 seconds
 });
 
-client.on(Events.InteractionCreate, async interaction => {
-    console.log(`Received interaction: ${interaction.commandName}`);
-
-    if (!interaction.isChatInputCommand()) return;
+// Handle interactions
+client.on(Events.InteractionCreate, async (interaction) => {
+    if (!interaction.isCommand()) return;
 
     const voiceChannel = interaction.member.voice.channel;
-    console.log(`Voice channel: ${voiceChannel ? voiceChannel.name : 'No voice channel'}`);
+    if (interaction.commandName === "ping") {
+        return interaction.reply("Pong!");
+    }
 
-    // Handle /start command for starting servers
+    // Example command handlers (can be moved to separate functions)
     if (interaction.commandName === "start") {
-        const serverType = interaction.options.getString('server');
-        console.log(`Starting server of type: ${serverType}`);
-
-        if (serverType === 'arma3') {
-            StartServer(interaction);
-        }
+        await StartServer(interaction);
     }
 
-    // Handle /stop command for stopping servers
-    else if (interaction.commandName === "stop") {
-        const serverType = interaction.options.getString('server');
-        console.log(`Stopping server of type: ${serverType}`);
-
-        if (serverType === 'arma3') {
-            StopServer(interaction);
-        }
+    if (interaction.commandName === "stop") {
+        await StopServer(interaction);
     }
 
-    // Handle /showactive command to show active servers and their PIDs
-    else if (interaction.commandName === "showactive") {
-        console.log('Showing active servers');
-        showActiveServers(interaction);
+    if (interaction.commandName === "showactive") {
+        await showActiveServers(interaction);
     }
 
-    // Handle other commands
-    else if (interaction.commandName === "ping") {
-        console.log('Ping command received');
-        await interaction.reply("Pong!");
+    if (interaction.commandName === "play") {
+        await playMusic(interaction, voiceChannel);
     }
 
-    // Handle music play commands
-    else if (interaction.commandName === "play") {
-        if (!voiceChannel) {
-            console.log('User is not in a voice channel');
-            return interaction.reply('You need to be in a voice channel to play music!');
-        }
-
-        console.log(`Joining voice channel: ${voiceChannel.name}`);
-        const connection = joinVoiceChannel({
-            channelId: voiceChannel.id,
-            guildId: interaction.guild.id,
-            adapterCreator: interaction.guild.voiceAdapterCreator,
-        });
-
-        const url = interaction.options.getString('url');
-        console.log(`Playing YouTube video: ${url}`);
-        const player = createAudioPlayer();
-        audioPlayers[interaction.guild.id] = player;
-
-        const resource = createAudioResource(ytdl(url, { filter: 'audioonly' }));
-        player.play(resource);
-        connection.subscribe(player);
-
-        await interaction.reply(`Now playing: ${url}`);
-
-        player.on('idle', () => {
-            connection.destroy();
-            delete audioPlayers[interaction.guild.id];
-            console.log('Left the voice channel.');
-        });
-    }
-    else if (interaction.commandName === "playlocal") {
-        if (!voiceChannel) {
-            console.log('User is not in a voice channel');
-            return interaction.reply('You need to be in a voice channel to play music!');
-        }
-
-        console.log(`Joining voice channel: ${voiceChannel.name}`);
-        const connection = joinVoiceChannel({
-            channelId: voiceChannel.id,
-            guildId: interaction.guild.id,
-            adapterCreator: interaction.guild.voiceAdapterCreator,
-        });
-
-        const filePath = interaction.options.getString('file');
-        console.log(`Playing local file: ${filePath}`);
-        const player = createAudioPlayer();
-        audioPlayers[interaction.guild.id] = player;
-
-        const resource = createAudioResource(path.resolve(filePath));
-        player.play(resource);
-        connection.subscribe(player);
-
-        await interaction.reply(`Now playing local file: ${filePath}`);
-
-        player.on('idle', () => {
-            connection.destroy();
-            delete audioPlayers[interaction.guild.id];
-            console.log('Left the voice channel.');
-        });
-    }
-    else if (interaction.commandName === "stopsound") {
-        if (!voiceChannel) {
-            console.log('User is not in a voice channel');
-            return interaction.reply('You need to be in a voice channel to stop the music!');
-        }
-
-        const player = audioPlayers[interaction.guild.id];
-        if (player) {
-            player.stop();
-            interaction.reply('Stopped the music and left the voice channel.');
-
-            const connection = getVoiceConnection(interaction.guild.id);
-            if (connection) {
-                connection.destroy();
-            }
-            delete audioPlayers[interaction.guild.id];
-        } else {
-            await interaction.reply('No music is currently playing.');
-        }
+    if (interaction.commandName === "playlocal") {
+        await playLocalMusic(interaction, voiceChannel);
     }
 
-    console.log(`Interaction processed: ${interaction.commandName}`);
+    if (interaction.commandName === "stopsound") {
+        await stopSound(interaction, voiceChannel);
+    }
 });
 
-// Function to start a game server (e.g., Arma 3)
+// Start the bot
+client.login(token);
+
+// Helper functions for server and music commands
 async function StartServer(interaction) {
-    console.log('StartServer function called');
-
+    // Logic for starting a server (e.g., Arma 3)
+    console.log("Starting server...");
     const isServerRunning = await checkIfServerRunning();
-
+    
     if (isServerRunning) {
-        console.log('Server is already running');
-        return interaction.reply('An Arma 3 server is already running. Please stop the current server before starting a new one.');
+        console.log('Server is already running.');
+        return interaction.reply('The server is already running!');
     }
 
-    const batFilePath = arma3server.batFilePath;
-    console.log(`Starting server using bat file: ${batFilePath}`);
-
-    const serverProcess = exec(`"${batFilePath}"`, (error, stdout, stderr) => {
+    const batFilePath = "your/server/start/script.bat"; // Replace with your path
+    const serverProcess = exec(batFilePath, (error, stdout, stderr) => {
         if (error) {
-            console.error(`exec error: ${error}`);
-            interaction.reply('Failed to start the server. Please check the logs.');
-            return;
+            console.error(`Error: ${stderr}`);
+            return interaction.reply('Failed to start the server!');
         }
-        if (stderr) {
-            console.error(`stderr: ${stderr}`);
-        }
-        console.log(`stdout: ${stdout}`);
-
+        console.log(`Server started: ${stdout}`);
         const pid = serverProcess.pid;
         activeServers[pid] = { status: 'running' };
-
-        interaction.reply(`Server has been started successfully with PID: ${pid}`);
+        interaction.reply(`Server started with PID: ${pid}`);
     });
 }
 
-// Function to stop a game server (e.g., Arma 3)
-function StopServer(interaction) {
-    console.log('StopServer function called');
-
+async function StopServer(interaction) {
+    // Logic for stopping a server
     const pid = Object.keys(activeServers)[0];
     if (!pid) {
-        console.log('No server running');
-        return interaction.reply('No server is currently running.');
+        console.log("No server running.");
+        return interaction.reply("No active server to stop.");
     }
 
     const killCommand = `taskkill /F /PID ${pid}`;
-    console.log(`Stopping server with PID: ${pid}`);
-
     exec(killCommand, (error, stdout, stderr) => {
         if (error) {
-            console.error(`exec error: ${error}`);
-            interaction.reply('Failed to stop the server. Please check the logs.');
-            return;
+            console.error(`Error: ${stderr}`);
+            return interaction.reply("Failed to stop the server!");
         }
-        if (stderr) {
-            console.error(`stderr: ${stderr}`);
-        }
-        console.log(`stdout: ${stdout}`);
-
+        console.log(`Server stopped: ${stdout}`);
         delete activeServers[pid];
-        interaction.reply('Server has been stopped successfully!');
+        interaction.reply("Server stopped successfully.");
     });
 }
 
-// Function to show active servers
-function showActiveServers(interaction) {
-    console.log('showActiveServers function called');
-
+async function showActiveServers(interaction) {
+    // Show active servers
     if (Object.keys(activeServers).length === 0) {
-        console.log('No active servers');
-        return interaction.reply('No active servers currently.');
+        return interaction.reply("No active servers.");
     }
 
-    const activeServerList = Object.keys(activeServers).map(pid => `PID: ${pid}`).join('\n');
+    const activeServerList = Object.keys(activeServers)
+        .map(pid => `PID: ${pid}`)
+        .join('\n');
     interaction.reply(`Active servers:\n${activeServerList}`);
 }
 
-// Function to check if an Arma 3 server is already running
-async function checkIfServerRunning() {
-    console.log('Checking if Arma 3 server is running');
+// CLI Interface using inquirer
+async function cliMenu() {
+    const answer = await inquirer.prompt([
+        {
+            type: 'list',
+            name: 'action',
+            message: 'What would you like to do?',
+            choices: [
+                { name: 'Start Server', value: 'start' },
+                { name: 'Stop Server', value: 'stop' },
+                { name: 'Show Active Servers', value: 'show' },
+                { name: 'Exit', value: 'exit' }
+            ]
+        }
+    ]);
 
+    switch (answer.action) {
+        case 'start':
+            await StartServer();
+            break;
+        case 'stop':
+            await StopServer();
+            break;
+        case 'show':
+            await showActiveServers();
+            break;
+        case 'exit':
+            console.log('Exiting CLI...');
+            process.exit(0);
+            break;
+    }
+
+    cliMenu(); // Recursively show the menu again after an action
+}
+
+// Start CLI in the terminal
+cliMenu();
+
+async function checkIfServerRunning() {
     return new Promise((resolve, reject) => {
         exec('tasklist /FI "IMAGENAME eq arma3server_x64.exe"', (error, stdout, stderr) => {
             if (error) {
@@ -326,5 +189,3 @@ async function checkIfServerRunning() {
         });
     });
 }
-
-client.login(token);

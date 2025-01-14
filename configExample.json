@@ -1,0 +1,7 @@
+{
+    "token":"DiscordToken",
+    "arma3server": {
+        "path": "C:/path/to/arma3server.exe",  
+        "batFilePath": "C:\\Path\\to\\serverLaunchFile.bat"
+  }    
+}
