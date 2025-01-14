@@ -35,7 +35,6 @@ client.once(Events.ClientReady, async () => {
 
         // Update the bot's presence (status)
         client.user.setPresence({ activities: [{ name: statusMessage }] });
-        //console.log('Bot status updated:', statusMessage); // Log the status for debugging
     }, 3000);  // Update the status every 3 seconds
 
     try {
@@ -56,7 +55,6 @@ client.once(Events.ClientReady, async () => {
                         .setRequired(true)
                         .addChoices(
                             { name: 'Arma 3', value: 'arma3' },
-                            // Future server types can be added here
                         )
                 ),
             new SlashCommandBuilder()
@@ -68,9 +66,11 @@ client.once(Events.ClientReady, async () => {
                         .setRequired(true)
                         .addChoices(
                             { name: 'Arma 3', value: 'arma3' },
-                            // Future server types can be added here
                         )
                 ),
+            new SlashCommandBuilder()
+                .setName('showactive')
+                .setDescription('Shows the active game servers and their PIDs'),
             new SlashCommandBuilder()
                 .setName('play')
                 .setDescription('Plays a YouTube video')
@@ -128,6 +128,11 @@ client.on(Events.InteractionCreate, async interaction => {
         if (serverType === 'arma3') {
             StopServer(interaction);
         }
+    }
+
+    // Handle /activeServers command to show active servers and their PIDs
+    else if (interaction.commandName === "activeServers") {
+        showActiveServers(interaction);
     }
 
     // Handle other commands
@@ -221,7 +226,14 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 // Function to start a game server (e.g., Arma 3)
-function StartServer(interaction) {
+async function StartServer(interaction) {
+    // Check if Arma 3 server is already running
+    const isServerRunning = await checkIfServerRunning();
+
+    if (isServerRunning) {
+        return interaction.reply('An Arma 3 server is already running. Please stop the current server before starting a new one.');
+    }
+
     const batFilePath = arma3server.batFilePath;  // Get the path from config.json
 
     const serverProcess = exec(`"${batFilePath}"`, (error, stdout, stderr) => {
@@ -274,29 +286,34 @@ function StopServer(interaction) {
     });
 }
 
-// Function to check if the server is still running
-function checkServerStatus(interaction) {
-    // Get the PID of the first server (example assumes only one server running)
-    const pid = Object.keys(activeServers)[0];
-
-    if (!pid || !activeServers[pid]) {
-        interaction.reply('No server is currently running.');
-        return;
+// Function to show active servers
+function showActiveServers(interaction) {
+    if (Object.keys(activeServers).length === 0) {
+        return interaction.reply('No active servers currently.');
     }
 
-    exec(`tasklist /fi "PID eq ${pid}"`, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`Error checking server status: ${stderr}`);
-            interaction.reply('Error checking server status.');
-            return;
-        }
+    const activeServerList = Object.keys(activeServers).map(pid => `PID: ${pid}`).join('\n');
 
-        if (stdout.includes(pid)) {
-            interaction.reply(`Server with PID ${pid} is still running.`);
-        } else {
-            interaction.reply(`Server with PID ${pid} is not running.`);
-            activeServers[pid] = { status: 'stopped' };  // Optionally, update status in memory
-        }
+    interaction.reply(`Active servers:\n${activeServerList}`);
+}
+
+// Function to check if an Arma 3 server is already running
+async function checkIfServerRunning() {
+    return new Promise((resolve, reject) => {
+        // Check the task list to see if the Arma 3 server is running
+        exec('tasklist /FI "IMAGENAME eq arma3server_x64.exe"', (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error checking server status: ${stderr}`);
+                reject(error);
+            }
+
+            // If the task list contains the process, the server is running
+            if (stdout.includes('arma3server_x64.exe')) {
+                resolve(true);
+            } else {
+                resolve(false);
+            }
+        });
     });
 }
 
