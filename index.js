@@ -36,64 +36,72 @@ client.once(Events.ClientReady, async () => {
         // Update the bot's presence (status)
         client.user.setPresence({ activities: [{ name: statusMessage }] });
         //console.log('Bot status updated:', statusMessage); // Log the status for debugging
-    }, 3000);  // Update the status every 1 seconds
-
-    const commands = [
-        new SlashCommandBuilder()
-            .setName('ping')
-            .setDescription('Replies with pong'),
-        new SlashCommandBuilder()
-            .setName('hello')
-            .setDescription('Says hello to someone!'),
-        new SlashCommandBuilder()
-            .setName('hola')
-            .setDescription('Says hello to someone!'),
-        new SlashCommandBuilder()
-            .setName('start')
-            .setDescription('Starts a game server')
-            .addStringOption(option =>
-                option.setName('server')
-                    .setDescription('The type of server to start')
-                    .setRequired(true)
-                    .addChoices(
-                        { name: 'Arma 3', value: 'arma3' },
-                        // Future server types can be added here
-                    )
-            ),
-        new SlashCommandBuilder()
-            .setName('stop')
-            .setDescription('Stops a game server')
-            .addStringOption(option =>
-                option.setName('server')
-                    .setDescription('The type of server to stop')
-                    .setRequired(true)
-                    .addChoices(
-                        { name: 'Arma 3', value: 'arma3' },
-                        // Future server types can be added here
-                    )
-            ),
-        new SlashCommandBuilder()
-            .setName('play')
-            .setDescription('Plays a YouTube video')
-            .addStringOption(option =>
-                option.setName('url')
-                    .setDescription('The YouTube video URL to play')
-                    .setRequired(true)),
-        new SlashCommandBuilder()
-            .setName('playlocal')
-            .setDescription('Plays a local audio file')
-            .addStringOption(option =>
-                option.setName('file')
-                    .setDescription('The path to the local audio file')
-                    .setRequired(true)),
-        new SlashCommandBuilder()
-            .setName('stopsound')
-            .setDescription('Stops the current audio and leaves the voice channel')
-    ].map(command => command.toJSON());
+    }, 3000);  // Update the status every 3 seconds
 
     try {
-        await client.application.commands.set(commands);
-        console.log('Commands registered successfully.');
+        // Fetch existing commands to check for duplicates
+        const existingCommands = await client.application.commands.fetch();
+        console.log('Existing commands:', existingCommands);
+
+        const commands = [
+            new SlashCommandBuilder()
+                .setName('ping')
+                .setDescription('Replies with pong'),
+            new SlashCommandBuilder()
+                .setName('start')
+                .setDescription('Starts a game server')
+                .addStringOption(option =>
+                    option.setName('server')
+                        .setDescription('The type of server to start')
+                        .setRequired(true)
+                        .addChoices(
+                            { name: 'Arma 3', value: 'arma3' },
+                            // Future server types can be added here
+                        )
+                ),
+            new SlashCommandBuilder()
+                .setName('stop')
+                .setDescription('Stops a game server')
+                .addStringOption(option =>
+                    option.setName('server')
+                        .setDescription('The type of server to stop')
+                        .setRequired(true)
+                        .addChoices(
+                            { name: 'Arma 3', value: 'arma3' },
+                            // Future server types can be added here
+                        )
+                ),
+            new SlashCommandBuilder()
+                .setName('play')
+                .setDescription('Plays a YouTube video')
+                .addStringOption(option =>
+                    option.setName('url')
+                        .setDescription('The YouTube video URL to play')
+                        .setRequired(true)),
+            new SlashCommandBuilder()
+                .setName('playlocal')
+                .setDescription('Plays a local audio file')
+                .addStringOption(option =>
+                    option.setName('file')
+                        .setDescription('The path to the local audio file')
+                        .setRequired(true)),
+            new SlashCommandBuilder()
+                .setName('stopsound')
+                .setDescription('Stops the current audio and leaves the voice channel')
+        ].map(command => command.toJSON());
+
+        // Filter out commands that already exist
+        const commandsToRegister = commands.filter(command => {
+            return !existingCommands.some(existingCommand => existingCommand.name === command.name);
+        });
+
+        if (commandsToRegister.length > 0) {
+            await client.application.commands.set(commandsToRegister);
+            console.log('New commands registered:', commandsToRegister);
+        } else {
+            console.log('No new commands to register (no duplicates).');
+        }
+
     } catch (error) {
         console.error('Error registering commands:', error);
     }
@@ -105,20 +113,23 @@ client.on(Events.InteractionCreate, async interaction => {
     const voiceChannel = interaction.member.voice.channel;
 
     // Handle /start command for starting servers
-    if (interaction.commandName === "launch") {
+    client.on(Events.InteractionCreate, async interaction => {
+        if (!interaction.isChatInputCommand()) return;
+    
+    // Handle /start command for starting servers
+    if (interaction.commandName === "start") {
         const serverType = interaction.options.getString('server'); // Get the server type from the command options
 
-        if (serverType === 'arma') {
+        if (serverType === 'arma3') {
             StartServer(interaction);
         }
-        // Add conditions here for other server types in the future (e.g., 'minecraft', 'csgo')
     }
 
     // Handle /stop command for stopping servers
     else if (interaction.commandName === "stop") {
         const serverType = interaction.options.getString('server'); // Get the server type from the command options
 
-        if (serverType === 'arma') {
+        if (serverType === 'arma3') {
             StopServer(interaction);
         }
         // Add conditions here for stopping other server types in the future
@@ -127,12 +138,6 @@ client.on(Events.InteractionCreate, async interaction => {
     // Handle other commands
     else if (interaction.commandName === "ping") {
         await interaction.reply("Pong!");
-    }
-    else if (interaction.commandName === "hello") {
-        await interaction.reply(`Hello ${interaction.user.username}`);
-    }
-    else if (interaction.commandName === "hola") {
-        await interaction.reply(`¡Hola ${interaction.user.username}!`);
     }
     else if (interaction.commandName === "play") {
         if (!voiceChannel) {
@@ -220,11 +225,12 @@ client.on(Events.InteractionCreate, async interaction => {
     console.log(interaction);
 });
 
-// Function to start a game server (e.g., Arma 3)
-function StartServer(interaction) {
-    const command = `${arma3server.path} ${arma3server.launchParams}`; // Use the values from config.json
 
-    exec(command, (error, stdout, stderr) => {
+// Function to stop a game server (e.g., Arma 3)
+function StartServer(interaction) {
+    const batFilePath = arma3server.batFilePath;  // Get the path from config.json
+
+    exec(`"${batFilePath}"`, (error, stdout, stderr) => {
         if (error) {
             console.error(`exec error: ${error}`);
             interaction.reply('Failed to start the server. Please check the logs.');
@@ -234,7 +240,7 @@ function StartServer(interaction) {
             console.error(`stderr: ${stderr}`);
         }
         console.log(`stdout: ${stdout}`);
-        
+
         // Notify the user that the server has been started
         interaction.reply('Server has been started successfully!');
     });
@@ -242,9 +248,9 @@ function StartServer(interaction) {
 
 // Function to stop a game server (e.g., Arma 3)
 function StopServer(interaction) {
-    const command = `${arma3server.path} -stop`; // Use the values from config.json for the stop command
+    const killCommand = 'taskkill /F /IM arma3server_x64.exe'; // Kill the running arma3server_x64.exe process
 
-    exec(command, (error, stdout, stderr) => {
+    exec(killCommand, (error, stdout, stderr) => {
         if (error) {
             console.error(`exec error: ${error}`);
             interaction.reply('Failed to stop the server. Please check the logs.');
