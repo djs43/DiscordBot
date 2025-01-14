@@ -35,7 +35,7 @@ client.once(Events.ClientReady, async () => {
 
         // Update the bot's presence (status)
         client.user.setPresence({ activities: [{ name: statusMessage }] });
-        console.log(`Bot status updated: ${statusMessage}`);
+        //console.log(`Bot status updated: ${statusMessage}`);
     }, 3000);  // Update the status every 3 seconds
 
     try {
