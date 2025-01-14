@@ -1,10 +1,11 @@
 const si = require('systeminformation');
 const { Client, Events, GatewayIntentBits, SlashCommandBuilder } = require("discord.js");
-const { token } = require("./config.json");
+const { token, arma3server } = require("./config.json");  // Destructure the new fields from config.json
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
 const ytdl = require('ytdl-core');
 const path = require('path');
-const os = require('os');  // To get system stats (CPU and RAM)
+const os = require('os');
+const { exec } = require('child_process'); // For running system commands (e.g., starting and stopping game servers)
 
 const client = new Client({
     intents: [
@@ -20,7 +21,7 @@ const audioPlayers = {};
 client.once(Events.ClientReady, async () => {
     console.log(`Logged in as ${client.user.tag}`);
 
-    // Update bot status every minute
+    // Update bot status every 3 seconds
     setInterval(async () => {
         // Get CPU usage using systeminformation
         const cpuData = await si.currentLoad();
@@ -35,7 +36,7 @@ client.once(Events.ClientReady, async () => {
         // Update the bot's presence (status)
         client.user.setPresence({ activities: [{ name: statusMessage }] });
         console.log('Bot status updated:', statusMessage); // Log the status for debugging
-    }, 3000);  // Update the status every 3 seconds (3000 ms)
+    }, 3000);  // Update the status every 3 seconds
 
     const commands = [
         new SlashCommandBuilder()
@@ -47,6 +48,30 @@ client.once(Events.ClientReady, async () => {
         new SlashCommandBuilder()
             .setName('hola')
             .setDescription('Says hello to someone!'),
+        new SlashCommandBuilder()
+            .setName('start')
+            .setDescription('Starts a game server')
+            .addStringOption(option =>
+                option.setName('server')
+                    .setDescription('The type of server to start')
+                    .setRequired(true)
+                    .addChoices(
+                        { name: 'Arma 3', value: 'arma3' },
+                        // Future server types can be added here
+                    )
+            ),
+        new SlashCommandBuilder()
+            .setName('stop')
+            .setDescription('Stops a game server')
+            .addStringOption(option =>
+                option.setName('server')
+                    .setDescription('The type of server to stop')
+                    .setRequired(true)
+                    .addChoices(
+                        { name: 'Arma 3', value: 'arma3' },
+                        // Future server types can be added here
+                    )
+            ),
         new SlashCommandBuilder()
             .setName('play')
             .setDescription('Plays a YouTube video')
@@ -79,7 +104,28 @@ client.on(Events.InteractionCreate, async interaction => {
 
     const voiceChannel = interaction.member.voice.channel;
 
-    if (interaction.commandName === "ping") {
+    // Handle /start command for starting servers
+    if (interaction.commandName === "start") {
+        const serverType = interaction.options.getString('server'); // Get the server type from the command options
+
+        if (serverType === 'arma3') {
+            startArma3Server(interaction);
+        }
+        // Add conditions here for other server types in the future (e.g., 'minecraft', 'csgo')
+    }
+
+    // Handle /stop command for stopping servers
+    else if (interaction.commandName === "stop") {
+        const serverType = interaction.options.getString('server'); // Get the server type from the command options
+
+        if (serverType === 'arma3') {
+            stopArma3Server(interaction);
+        }
+        // Add conditions here for stopping other server types in the future
+    }
+
+    // Handle other commands
+    else if (interaction.commandName === "ping") {
         await interaction.reply("Pong!");
     }
     else if (interaction.commandName === "hello") {
@@ -173,5 +219,45 @@ client.on(Events.InteractionCreate, async interaction => {
 
     console.log(interaction);
 });
+
+// Function to start an Arma 3 server
+function startArma3Server(interaction) {
+    const command = `${arma3server.path} ${arma3server.launchParams}`; // Use the values from config.json
+
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`exec error: ${error}`);
+            interaction.reply('Failed to start Arma 3 server. Please check the logs.');
+            return;
+        }
+        if (stderr) {
+            console.error(`stderr: ${stderr}`);
+        }
+        console.log(`stdout: ${stdout}`);
+        
+        // Notify the user that the server has been started
+        interaction.reply('Arma 3 server has been started successfully!');
+    });
+}
+
+// Function to stop an Arma 3 server
+function stopArma3Server(interaction) {
+    const command = `${arma3server.path} -stop`; // Use the values from config.json for the stop command
+
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`exec error: ${error}`);
+            interaction.reply('Failed to stop Arma 3 server. Please check the logs.');
+            return;
+        }
+        if (stderr) {
+            console.error(`stderr: ${stderr}`);
+        }
+        console.log(`stdout: ${stdout}`);
+
+        // Notify the user that the server has been stopped
+        interaction.reply('Arma 3 server has been stopped successfully!');
+    });
+}
 
 client.login(token);
