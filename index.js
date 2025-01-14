@@ -113,10 +113,6 @@ client.on(Events.InteractionCreate, async interaction => {
     const voiceChannel = interaction.member.voice.channel;
 
     // Handle /start command for starting servers
-    client.on(Events.InteractionCreate, async interaction => {
-        if (!interaction.isChatInputCommand()) return;
-    
-    // Handle /start command for starting servers
     if (interaction.commandName === "start") {
         const serverType = interaction.options.getString('server'); // Get the server type from the command options
 
@@ -225,8 +221,7 @@ client.on(Events.InteractionCreate, async interaction => {
     console.log(interaction);
 });
 
-
-// Function to stop a game server (e.g., Arma 3)
+// Function to start a game server (e.g., Arma 3)
 function StartServer(interaction) {
     const batFilePath = arma3server.batFilePath;  // Get the path from config.json
 
