@@ -35,8 +35,8 @@ client.once(Events.ClientReady, async () => {
 
         // Update the bot's presence (status)
         client.user.setPresence({ activities: [{ name: statusMessage }] });
-        console.log('Bot status updated:', statusMessage); // Log the status for debugging
-    }, 3000);  // Update the status every 3 seconds
+        //console.log('Bot status updated:', statusMessage); // Log the status for debugging
+    }, 3000);  // Update the status every 1 seconds
 
     const commands = [
         new SlashCommandBuilder()
@@ -87,7 +87,7 @@ client.once(Events.ClientReady, async () => {
                     .setDescription('The path to the local audio file')
                     .setRequired(true)),
         new SlashCommandBuilder()
-            .setName('stop')
+            .setName('stopsound')
             .setDescription('Stops the current audio and leaves the voice channel')
     ].map(command => command.toJSON());
 
@@ -109,7 +109,7 @@ client.on(Events.InteractionCreate, async interaction => {
         const serverType = interaction.options.getString('server'); // Get the server type from the command options
 
         if (serverType === 'arma3') {
-            startArma3Server(interaction);
+            StartServer(interaction);
         }
         // Add conditions here for other server types in the future (e.g., 'minecraft', 'csgo')
     }
@@ -119,7 +119,7 @@ client.on(Events.InteractionCreate, async interaction => {
         const serverType = interaction.options.getString('server'); // Get the server type from the command options
 
         if (serverType === 'arma3') {
-            stopArma3Server(interaction);
+            StopServer(interaction);
         }
         // Add conditions here for stopping other server types in the future
     }
@@ -196,7 +196,7 @@ client.on(Events.InteractionCreate, async interaction => {
             console.log('Left the voice channel.');
         });
     }
-    else if (interaction.commandName === "stop") {
+    else if (interaction.commandName === "stopsound") {
         if (!voiceChannel) {
             return interaction.reply('You need to be in a voice channel to stop the music!');
         }
@@ -220,14 +220,14 @@ client.on(Events.InteractionCreate, async interaction => {
     console.log(interaction);
 });
 
-// Function to start an Arma 3 server
-function startArma3Server(interaction) {
+// Function to start a game server (e.g., Arma 3)
+function StartServer(interaction) {
     const command = `${arma3server.path} ${arma3server.launchParams}`; // Use the values from config.json
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
             console.error(`exec error: ${error}`);
-            interaction.reply('Failed to start Arma 3 server. Please check the logs.');
+            interaction.reply('Failed to start the server. Please check the logs.');
             return;
         }
         if (stderr) {
@@ -236,18 +236,18 @@ function startArma3Server(interaction) {
         console.log(`stdout: ${stdout}`);
         
         // Notify the user that the server has been started
-        interaction.reply('Arma 3 server has been started successfully!');
+        interaction.reply('Server has been started successfully!');
     });
 }
 
-// Function to stop an Arma 3 server
-function stopArma3Server(interaction) {
+// Function to stop a game server (e.g., Arma 3)
+function StopServer(interaction) {
     const command = `${arma3server.path} -stop`; // Use the values from config.json for the stop command
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
             console.error(`exec error: ${error}`);
-            interaction.reply('Failed to stop Arma 3 server. Please check the logs.');
+            interaction.reply('Failed to stop the server. Please check the logs.');
             return;
         }
         if (stderr) {
@@ -256,7 +256,7 @@ function stopArma3Server(interaction) {
         console.log(`stdout: ${stdout}`);
 
         // Notify the user that the server has been stopped
-        interaction.reply('Arma 3 server has been stopped successfully!');
+        interaction.reply('Server has been stopped successfully!');
     });
 }
 
