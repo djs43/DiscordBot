@@ -4,6 +4,56 @@ const { arma3server } = require("./config.json"); // Import config.json
 // Store the PIDs of active servers in memory
 let activeServers = {};
 
+// Helper function to check if a specific server is running
+const checkServerRunning = (serverName) => {
+    return new Promise((resolve, reject) => {
+        exec(`tasklist /FI "IMAGENAME eq ${serverName}" /FO CSV /NH`, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error checking ${serverName} status: ${stderr}`);
+                reject(error);
+            }
+
+            const lines = stdout.trim().split('\n');
+            if (lines.length > 0) {
+                const serverInfo = lines[0].split(',');
+                if (serverInfo.length >= 2) {
+                    const pid = serverInfo[1].replace(/"/g, '').trim();
+                    const name = serverInfo[0].replace(/"/g, '').trim();
+                    resolve({ pid, name });  // Server is running, resolve with PID and name
+                }
+            }
+            resolve(null); // No server found
+        });
+    });
+};
+
+// Function to get all running servers with details
+async function getRunningServers() {
+    console.log("Checking for running server instances...");
+
+    try {
+        const [arma3Server, vintagestoryServer] = await Promise.all([
+            checkServerRunning('arma3server_x64.exe'),
+            checkServerRunning('VintagestoryServer.exe')
+        ]);
+
+        const runningServers = [];
+        if (arma3Server) runningServers.push(arma3Server);
+        if (vintagestoryServer) runningServers.push(vintagestoryServer);
+
+        return runningServers; // Return all running server details
+    } catch (error) {
+        console.error("Error checking running servers:", error);
+        return [];
+    }
+}
+
+// Function to check if any server is running
+async function checkIfServerRunning() {
+    const runningServers = await getRunningServers();
+    return runningServers.length > 0; // If there are any running servers
+}
+
 // Function to start the server
 async function StartServer() {
     console.log('Starting server...');
@@ -27,37 +77,6 @@ async function StartServer() {
     });
 
     return 'Server started successfully.';
-}
-
-// Helper function to check all running instances of arma3server_x64.exe and get their PIDs
-async function getRunningServers() {
-    return new Promise((resolve, reject) => {
-        console.log("Checking for running server instances...");
-        exec('tasklist /FI "IMAGENAME eq arma3server_x64.exe" /FO CSV /NH', (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error checking server status: ${stderr}`);
-                reject(error);
-            }
-
-            const lines = stdout.trim().split('\n');
-            if (lines.length > 0) {
-                const servers = lines.map(line => {
-                    const serverInfo = line.split(',');
-
-                    if (serverInfo.length > 1) {
-                        const pid = serverInfo[1].replace(/"/g, '').trim();
-                        const name = serverInfo[0].replace(/"/g, '').trim();
-                        return { pid, name }; // Return both PID and name of each running server
-                    }
-                    return null; // Return null if data is invalid
-                }).filter(server => server !== null); // Remove any invalid entries
-
-                resolve(servers);  // Return an array of running server objects
-            } else {
-                resolve([]);  // No active servers found
-            }
-        });
-    });
 }
 
 // Function to stop all running servers
@@ -115,38 +134,6 @@ async function showActiveServers() {
         console.error("Error checking active servers:", error);
         return "Error checking active servers.";
     }
-}
-
-// Helper function to check if any instances of arma3server_x64.exe are running
-async function checkIfServerRunning() {
-    return new Promise((resolve, reject) => {
-        console.log("Checking if server is running...");
-
-        exec('tasklist /FI "IMAGENAME eq arma3server_x64.exe" /FO CSV /NH', (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error checking server status: ${stderr}`);
-                reject(error);
-            }
-
-            const lines = stdout.trim().split('\n');
-            if (lines.length === 0 || lines[0].trim() === '') {
-                console.log('No running servers found.');
-                resolve(false);
-                return;
-            }
-
-            const serverInfo = lines[0].split(',');
-            if (serverInfo.length >= 2) {
-                const pid = serverInfo[1].replace(/"/g, '').trim();
-                const name = serverInfo[0].replace(/"/g, '').trim();
-                console.log(`Server is running. PID: ${pid}, Name: ${name}`);
-                resolve(true);
-            } else {
-                console.log('No valid server information found.');
-                resolve(false);
-            }
-        });
-    });
 }
 
 module.exports = { StartServer, StopServer, showActiveServers };
