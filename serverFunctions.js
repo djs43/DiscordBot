@@ -20,7 +20,7 @@ async function StartServer(serverName) {
     }
 
     // Check if the selected server is already running
-    const isServerRunning = await checkIfServerRunning();
+    const isServerRunning = await checkIfSpecificServerRunning(serverName);
     if (isServerRunning) {
         console.log(`${serverName} server is already running.`);
         return `${serverName} server is already running.`;
@@ -43,11 +43,11 @@ async function StartServer(serverName) {
 }
 
 // Helper function to check if a specific server is running
-const checkServerRunning = (serverName) => {
+const checkServerRunning = (serverExeName) => {
     return new Promise((resolve, reject) => {
-        exec(`tasklist /FI "IMAGENAME eq ${serverName}" /FO CSV /NH`, (error, stdout, stderr) => {
+        exec(`tasklist /FI "IMAGENAME eq ${serverExeName}" /FO CSV /NH`, (error, stdout, stderr) => {
             if (error) {
-                console.error(`Error checking ${serverName} status: ${stderr}`);
+                console.error(`Error checking ${serverExeName} status: ${stderr}`);
                 reject(error);
             }
 
@@ -86,10 +86,17 @@ async function getRunningServers() {
     }
 }
 
-// Function to check if any server is running
-async function checkIfServerRunning() {
+// Function to check if a specific server is running
+async function checkIfSpecificServerRunning(serverName) {
+    let serverExeName;
+    if (serverName === 'arma3') {
+        serverExeName = 'arma3server_x64.exe';
+    } else if (serverName === 'vintageStory') {
+        serverExeName = 'VintagestoryServer.exe';
+    }
+
     const runningServers = await getRunningServers();
-    return runningServers.length > 0; // If there are any running servers
+    return runningServers.some(server => server.name === serverExeName); // Check if the specific server is running
 }
 
 // Function to stop the server, takes the server name (either 'arma3' or 'vintageStory') as an argument

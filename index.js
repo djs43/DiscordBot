@@ -48,12 +48,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
         return interaction.reply("Pong!");
     }
 
-    // Example command handlers (can be moved to separate functions)
-     // Start server
-     if (interaction.commandName === "start") {
+    if (interaction.commandName === 'ip') {
+        try {
+            // Fetch public IP using ipify API
+            const response = await axios.get('https://api.ipify.org?format=json');
+            const publicIP = response.data.ip;
+            await interaction.reply(`Your public IP address is: ${publicIP}`);
+        } catch (error) {
+            console.error("Error fetching public IP:", error);
+            await interaction.reply("Sorry, there was an error fetching your public IP.");
+        }
+    }
+
+    if (interaction.commandName === "start") {
         const serverType = interaction.options.getString("server"); // Get the server type argument
         if (serverType === "arma3") {
-            const result = await StartServer();  // Call StartServer from serverFunctions.js
+            const result = await StartServer("arma3");  // Call StartServer for Arma 3
+            await interaction.reply(result);  // Send the result back to Discord
+        } else if (serverType === "vintageStory") {
+            const result = await StartServer("vintageStory");  // Call StartServer for Vintage Story
             await interaction.reply(result);  // Send the result back to Discord
         }
     }
@@ -62,7 +75,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.commandName === "stop") {
         const serverType = interaction.options.getString("server"); // Get the server type argument
         if (serverType === "arma3") {
-            const result = await StopServer();  // Call StopServer from serverFunctions.js
+            const result = await StopServer("arma3");  // Call StopServer for Arma 3
+            await interaction.reply(result);  // Send the result back to Discord
+        } else if (serverType === "vintageStory") {
+            const result = await StopServer("vintageStory");  // Call StopServer for Vintage Story
             await interaction.reply(result);  // Send the result back to Discord
         }
     }

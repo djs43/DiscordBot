@@ -11,7 +11,10 @@ module.exports = {
                     option.setName('server')
                         .setDescription('The type of server to start')
                         .setRequired(true)
-                        .addChoices({ name: 'Arma 3', value: 'arma3' })
+                        .addChoices(
+                            { name: 'Arma 3', value: 'arma3' },
+                            { name: 'Vintage Story', value: 'vintageStory' }  
+                        )
                 ),
             new SlashCommandBuilder()
                 .setName('stop')
@@ -20,7 +23,10 @@ module.exports = {
                     option.setName('server')
                         .setDescription('The type of server to stop')
                         .setRequired(true)
-                        .addChoices({ name: 'Arma 3', value: 'arma3' })
+                        .addChoices(
+                            { name: 'Arma 3', value: 'arma3' },
+                            { name: 'Vintage Story', value: 'vintageStory' } 
+                        )
                 ),
             new SlashCommandBuilder()
                 .setName('showactive')
@@ -41,7 +47,10 @@ module.exports = {
                         .setRequired(true)),
             new SlashCommandBuilder()
                 .setName('stopsound')
-                .setDescription('Stops the current audio and leaves the voice channel')
+                .setDescription('Stops the current audio and leaves the voice channel'),
+            new SlashCommandBuilder()
+            .setName('ip')
+            .setDescription('Shows your public IP address'),
         ];
 
         // Register commands to Discord
