@@ -107,13 +107,35 @@ async function cliMenu() {
 
     switch (answer.action) {
         case 'start':
-            await StartServer();
+            const startAnswers = await inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'server',
+                    message: 'Which server would you like to start?',
+                    choices: [
+                        { name: 'Arma 3', value: 'arma3' },
+                        { name: 'Vintage Story', value: 'vintageStory' }
+                    ]
+                }
+            ]);
+            await StartServer(startAnswers.server);  // Await the result of starting the selected server
             break;
         case 'stop':
-            await StopServer();
+            const stopAnswers = await inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'server',
+                    message: 'Which server would you like to stop?',
+                    choices: [
+                        { name: 'Arma 3', value: 'arma3' },
+                        { name: 'Vintage Story', value: 'vintageStory' }
+                    ]
+                }
+            ]);
+            await StopServer(stopAnswers.server);  // Await the result of stopping the selected server
             break;
         case 'show':
-            await showActiveServers();
+            await showActiveServers();  // Await the result of showing active servers
             break;
         case 'exit':
             console.log('Exiting CLI...');
@@ -125,4 +147,4 @@ async function cliMenu() {
 }
 
 // Start CLI in the terminal
-cliMenu();
+cliMenu();  // Start the CLI

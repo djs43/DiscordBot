@@ -1,8 +1,46 @@
 const { exec } = require('child_process');
-const { arma3server } = require("./config.json"); // Import config.json
+const { arma3server, vintageStory } = require("./config.json"); // Import config.json
 
 // Store the PIDs of active servers in memory
 let activeServers = {};
+
+// Function to start the server, takes the server name (either 'arma3' or 'vintageStory') as an argument
+async function StartServer(serverName) {
+    console.log(`Starting ${serverName} server...`);
+
+    // Determine the server path based on the serverName argument
+    let serverExePath;
+    if (serverName === 'arma3') {
+        serverExePath = arma3server.batFilePath;
+    } else if (serverName === 'vintageStory') {
+        serverExePath = vintageStory.exePath;
+    } else {
+        console.log(`Unknown server name: ${serverName}`);
+        return `Unknown server name: ${serverName}`;
+    }
+
+    // Check if the selected server is already running
+    const isServerRunning = await checkIfServerRunning();
+    if (isServerRunning) {
+        console.log(`${serverName} server is already running.`);
+        return `${serverName} server is already running.`;
+    }
+
+    // If the server is not running, start it using the appropriate bat file or executable
+    const batFilePath = `"${serverExePath}"`; // Wrap the path in quotes to handle spaces
+    console.log(`Starting server with command: ${batFilePath}`);
+
+    const serverProcess = exec(batFilePath, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error: ${stderr}`);
+            return `Error starting the ${serverName} server.`;
+        }
+        console.log(`${serverName} server started: ${stdout}`);
+        activeServers[serverProcess.pid] = { status: 'running', serverName };
+    });
+
+    return `${serverName} server started successfully.`;
+}
 
 // Helper function to check if a specific server is running
 const checkServerRunning = (serverName) => {
@@ -54,65 +92,43 @@ async function checkIfServerRunning() {
     return runningServers.length > 0; // If there are any running servers
 }
 
-// Function to start the server
-async function StartServer() {
-    console.log('Starting server...');
+// Function to stop the server, takes the server name (either 'arma3' or 'vintageStory') as an argument
+async function StopServer(serverName) {
+    console.log(`Stopping ${serverName} server...`);
 
-    const isServerRunning = await checkIfServerRunning();
-    if (isServerRunning) {
-        console.log('Server is already running.');
-        return 'Server is already running.';
+    // Determine the executable name based on the serverName argument
+    let serverExeName;
+    if (serverName === 'arma3') {
+        serverExeName = 'arma3server_x64.exe';
+    } else if (serverName === 'vintageStory') {
+        serverExeName = 'VintagestoryServer.exe';
+    } else {
+        console.log(`Unknown server name: ${serverName}`);
+        return `Unknown server name: ${serverName}`;
     }
 
-    const batFilePath = `"${arma3server.batFilePath}"`; // Wrap the path in quotes to handle spaces
-    console.log(batFilePath);
+    // Get the running servers' details
+    const runningServers = await getRunningServers();
 
-    const serverProcess = exec(batFilePath, (error, stdout, stderr) => {
+    // Filter the running servers to find the one matching the server name
+    const serverToStop = runningServers.find(server => server.name === serverExeName);
+
+    if (!serverToStop) {
+        console.log(`${serverName} server is not running.`);
+        return `${serverName} server is not running.`;
+    }
+
+    // If the server is running, stop it
+    const killCommand = `taskkill /F /PID ${serverToStop.pid}`;
+    exec(killCommand, (error, stdout, stderr) => {
         if (error) {
-            console.error(`Error: ${stderr}`);
-            return 'Error starting the server.';
+            console.error(`Error stopping server with PID ${serverToStop.pid}: ${stderr}`);
+            return;
         }
-        console.log(`Server started: ${stdout}`);
-        activeServers[serverProcess.pid] = { status: 'running' };
+        console.log(`${serverName} server with PID ${serverToStop.pid} stopped: ${stdout}`);
     });
 
-    return 'Server started successfully.';
-}
-
-// Function to stop all running servers
-async function StopServer() {
-    try {
-        const runningServers = await getRunningServers();
-
-        if (runningServers.length === 0) {
-            console.log("No active servers to stop.");
-            return "No active servers to stop.";
-        }
-
-        const killedPIDs = [];
-        for (let server of runningServers) {
-            const killCommand = `taskkill /F /PID ${server.pid}`;
-            exec(killCommand, (error, stdout, stderr) => {
-                if (error) {
-                    console.error(`Error stopping server with PID ${server.pid}: ${stderr}`);
-                    return;
-                }
-                console.log(`Server with PID ${server.pid} stopped: ${stdout}`);
-                killedPIDs.push(server.pid);
-            });
-        }
-
-        if (killedPIDs.length > 0) {
-            console.log(`The following servers have been killed: ${killedPIDs.join(', ')}`);
-            return `The following servers have been killed: ${killedPIDs.join(', ')}`;
-        } else {
-            console.log("No servers were killed.");
-            return "No servers were killed.";
-        }
-    } catch (error) {
-        console.error("Error stopping servers:", error);
-        return "Error stopping servers.";
-    }
+    return `${serverName} server stopped successfully.`;
 }
 
 // Function to show active servers with PID
@@ -136,4 +152,5 @@ async function showActiveServers() {
     }
 }
 
+// Export the functions
 module.exports = { StartServer, StopServer, showActiveServers };
