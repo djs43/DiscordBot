@@ -32,23 +32,6 @@ module.exports = {
                 .setName('showactive')
                 .setDescription('Shows the active game servers and their PIDs'),
             new SlashCommandBuilder()
-                .setName('play')
-                .setDescription('Plays a YouTube video')
-                .addStringOption(option =>
-                    option.setName('url')
-                        .setDescription('The YouTube video URL to play')
-                        .setRequired(true)),
-            new SlashCommandBuilder()
-                .setName('playlocal')
-                .setDescription('Plays a local audio file')
-                .addStringOption(option =>
-                    option.setName('file')
-                        .setDescription('The path to the local audio file')
-                        .setRequired(true)),
-            new SlashCommandBuilder()
-                .setName('stopsound')
-                .setDescription('Stops the current audio and leaves the voice channel'),
-            new SlashCommandBuilder()
             .setName('ip')
             .setDescription('Shows your public IP address'),
         ];

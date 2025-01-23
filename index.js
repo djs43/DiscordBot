@@ -5,6 +5,7 @@ const { joinVoiceChannel, createAudioPlayer, createAudioResource, getVoiceConnec
 const { exec } = require('child_process');
 const si = require('systeminformation');
 const os = require('os');
+const axios = require('axios');
 const inquirer = require('inquirer');  // Import inquirer for CLI prompts
 const { StartServer, StopServer, showActiveServers } = require("./serverFunctions"); // Import server functions
 
@@ -53,10 +54,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
             // Fetch public IP using ipify API
             const response = await axios.get('https://api.ipify.org?format=json');
             const publicIP = response.data.ip;
-            await interaction.reply(`Your public IP address is: ${publicIP}`);
+            await interaction.reply(`Current IP address is: ${publicIP}`);
         } catch (error) {
             console.error("Error fetching public IP:", error);
-            await interaction.reply("Sorry, there was an error fetching your public IP.");
+            await interaction.reply("There was an error fetching the IP.");
         }
     }
 
@@ -89,17 +90,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.reply(result);  // Send the result back to Discord
     }
 
-    if (interaction.commandName === "play") {
-        await playMusic(interaction, voiceChannel);
-    }
-
-    if (interaction.commandName === "playlocal") {
-        await playLocalMusic(interaction, voiceChannel);
-    }
-
-    if (interaction.commandName === "stopsound") {
-        await stopSound(interaction, voiceChannel);
-    }
+    
 });
 
 // Start the bot
