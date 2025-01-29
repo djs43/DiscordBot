@@ -1,10 +1,13 @@
-const si = require('systeminformation');
-const { Client, Events, GatewayIntentBits, SlashCommandBuilder } = require("discord.js");
+const { Client, Events, GatewayIntentBits } = require("discord.js");
 const { token } = require("./config.json");
+const { registerCommands } = require("./commands"); // Separate commands module for better structure
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
-const ytdl = require('ytdl-core');
-const path = require('path');
-const os = require('os');  // To get system stats (CPU and RAM)
+const { exec } = require('child_process');
+const si = require('systeminformation');
+const os = require('os');
+const axios = require('axios');
+const inquirer = require('inquirer');  // Import inquirer for CLI prompts
+const { StartServer, StopServer, showActiveServers } = require("./serverFunctions"); // Import server functions
 
 const client = new Client({
     intents: [
@@ -14,164 +17,141 @@ const client = new Client({
     ]
 });
 
-// Store the audio player for each guild
-const audioPlayers = {};
-
+// Register commands on bot startup
 client.once(Events.ClientReady, async () => {
     console.log(`Logged in as ${client.user.tag}`);
 
-    // Update bot status every minute
-    setInterval(async () => {
-        // Get CPU usage using systeminformation
-        const cpuData = await si.currentLoad();
-        const cpuUsage = cpuData.currentLoad.toFixed(2); // Get CPU load as a percentage
+    // Register commands in the server (this ensures commands are always up to date)
+    try {
+        await registerCommands(client);
+        console.log("Commands registered successfully.");
+    } catch (error) {
+        console.error("Error registering commands:", error);
+    }
 
-        // Get RAM usage
+    // Update bot status periodically
+    setInterval(async () => {
+        const cpuData = await si.currentLoad();
+        const cpuUsage = cpuData.currentLoad.toFixed(2);
         const ramUsage = (os.totalmem() - os.freemem()) / os.totalmem() * 100;
 
-        // Format the status message
         const statusMessage = `CPU: ${cpuUsage}% | RAM: ${ramUsage.toFixed(2)}%`;
-
-        // Update the bot's presence (status)
         client.user.setPresence({ activities: [{ name: statusMessage }] });
-        console.log('Bot status updated:', statusMessage); // Log the status for debugging
-    }, 3000);  // Update the status every 3 seconds (3000 ms)
-
-    const commands = [
-        new SlashCommandBuilder()
-            .setName('ping')
-            .setDescription('Replies with pong'),
-        new SlashCommandBuilder()
-            .setName('hello')
-            .setDescription('Says hello to someone!'),
-        new SlashCommandBuilder()
-            .setName('hola')
-            .setDescription('Says hello to someone!'),
-        new SlashCommandBuilder()
-            .setName('play')
-            .setDescription('Plays a YouTube video')
-            .addStringOption(option =>
-                option.setName('url')
-                    .setDescription('The YouTube video URL to play')
-                    .setRequired(true)),
-        new SlashCommandBuilder()
-            .setName('playlocal')
-            .setDescription('Plays a local audio file')
-            .addStringOption(option =>
-                option.setName('file')
-                    .setDescription('The path to the local audio file')
-                    .setRequired(true)),
-        new SlashCommandBuilder()
-            .setName('stop')
-            .setDescription('Stops the current audio and leaves the voice channel')
-    ].map(command => command.toJSON());
-
-    try {
-        await client.application.commands.set(commands);
-        console.log('Commands registered successfully.');
-    } catch (error) {
-        console.error('Error registering commands:', error);
-    }
+    }, 3000); // Update every 3 seconds
 });
 
-client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isChatInputCommand()) return;
+// Handle interactions
+client.on(Events.InteractionCreate, async (interaction) => {
+    if (!interaction.isCommand()) return;
 
     const voiceChannel = interaction.member.voice.channel;
-
     if (interaction.commandName === "ping") {
-        await interaction.reply("Pong!");
+        return interaction.reply("Pong!");
     }
-    else if (interaction.commandName === "hello") {
-        await interaction.reply(`Hello ${interaction.user.username}`);
-    }
-    else if (interaction.commandName === "hola") {
-        await interaction.reply(`¡Hola ${interaction.user.username}!`);
-    }
-    else if (interaction.commandName === "play") {
-        if (!voiceChannel) {
-            return interaction.reply('You need to be in a voice channel to play music!');
-        }
 
-        const connection = joinVoiceChannel({
-            channelId: voiceChannel.id,
-            guildId: interaction.guild.id,
-            adapterCreator: interaction.guild.voiceAdapterCreator,
-        });
-
-        const url = interaction.options.getString('url');
-        const player = createAudioPlayer();
-
-        // Store the player for the current guild
-        audioPlayers[interaction.guild.id] = player;
-
-        // Create a stream from the YouTube video
-        const resource = createAudioResource(ytdl(url, { filter: 'audioonly' }));
-
-        player.play(resource);
-        connection.subscribe(player);
-
-        await interaction.reply(`Now playing: ${url}`);
-
-        player.on('idle', () => {
-            connection.destroy();
-            delete audioPlayers[interaction.guild.id]; // Remove player reference
-            console.log('Left the voice channel.');
-        });
-    }
-    else if (interaction.commandName === "playlocal") {
-        if (!voiceChannel) {
-            return interaction.reply('You need to be in a voice channel to play music!');
-        }
-
-        const connection = joinVoiceChannel({
-            channelId: voiceChannel.id,
-            guildId: interaction.guild.id,
-            adapterCreator: interaction.guild.voiceAdapterCreator,
-        });
-
-        const filePath = interaction.options.getString('file');
-        const player = createAudioPlayer();
-
-        // Store the player for the current guild
-        audioPlayers[interaction.guild.id] = player;
-
-        // Resolve the path to the local audio file
-        const resource = createAudioResource(path.resolve(filePath));
-
-        player.play(resource);
-        connection.subscribe(player);
-
-        await interaction.reply(`Now playing local file: ${filePath}`);
-
-        player.on('idle', () => {
-            connection.destroy();
-            delete audioPlayers[interaction.guild.id]; // Remove player reference
-            console.log('Left the voice channel.');
-        });
-    }
-    else if (interaction.commandName === "stop") {
-        if (!voiceChannel) {
-            return interaction.reply('You need to be in a voice channel to stop the music!');
-        }
-
-        const player = audioPlayers[interaction.guild.id];
-        if (player) {
-            player.stop();
-            interaction.reply('Stopped the music and left the voice channel.');
-
-            // Destroy the connection
-            const connection = getVoiceConnection(interaction.guild.id);
-            if (connection) {
-                connection.destroy();
-            }
-            delete audioPlayers[interaction.guild.id]; // Remove player reference
-        } else {
-            await interaction.reply('No music is currently playing.');
+    if (interaction.commandName === 'ip') {
+        try {
+            // Fetch public IP using ipify API
+            const response = await axios.get('https://api.ipify.org?format=json');
+            const publicIP = response.data.ip;
+            await interaction.reply(`Current IP address is: ${publicIP}`);
+        } catch (error) {
+            console.error("Error fetching public IP:", error);
+            await interaction.reply("There was an error fetching the IP.");
         }
     }
 
-    console.log(interaction);
+    if (interaction.commandName === "start") {
+        const serverType = interaction.options.getString("server"); // Get the server type argument
+        if (serverType === "arma3") {
+            const result = await StartServer("arma3");  // Call StartServer for Arma 3
+            await interaction.reply(result);  // Send the result back to Discord
+        } else if (serverType === "vintageStory") {
+            const result = await StartServer("vintageStory");  // Call StartServer for Vintage Story
+            await interaction.reply(result);  // Send the result back to Discord
+        }
+    }
+
+    // Stop server
+    if (interaction.commandName === "stop") {
+        const serverType = interaction.options.getString("server"); // Get the server type argument
+        if (serverType === "arma3") {
+            const result = await StopServer("arma3");  // Call StopServer for Arma 3
+            await interaction.reply(result);  // Send the result back to Discord
+        } else if (serverType === "vintageStory") {
+            const result = await StopServer("vintageStory");  // Call StopServer for Vintage Story
+            await interaction.reply(result);  // Send the result back to Discord
+        }
+    }
+
+    // Show active servers
+    if (interaction.commandName === "showactive") {
+        const result = await showActiveServers();  // Call showActiveServers from serverFunctions.js
+        await interaction.reply(result);  // Send the result back to Discord
+    }
+
+    
 });
 
+// Start the bot
 client.login(token);
+
+// CLI Interface using inquirer
+async function cliMenu() {
+    const answer = await inquirer.prompt([
+        {
+            type: 'list',
+            name: 'action',
+            message: 'What would you like to do?',
+            choices: [
+                { name: 'Start Server', value: 'start' },
+                { name: 'Stop Server', value: 'stop' },
+                { name: 'Show Active Servers', value: 'show' },
+                { name: 'Exit', value: 'exit' }
+            ]
+        }
+    ]);
+
+    switch (answer.action) {
+        case 'start':
+            const startAnswers = await inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'server',
+                    message: 'Which server would you like to start?',
+                    choices: [
+                        { name: 'Arma 3', value: 'arma3' },
+                        { name: 'Vintage Story', value: 'vintageStory' }
+                    ]
+                }
+            ]);
+            await StartServer(startAnswers.server);  // Await the result of starting the selected server
+            break;
+        case 'stop':
+            const stopAnswers = await inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'server',
+                    message: 'Which server would you like to stop?',
+                    choices: [
+                        { name: 'Arma 3', value: 'arma3' },
+                        { name: 'Vintage Story', value: 'vintageStory' }
+                    ]
+                }
+            ]);
+            await StopServer(stopAnswers.server);  // Await the result of stopping the selected server
+            break;
+        case 'show':
+            await showActiveServers();  // Await the result of showing active servers
+            break;
+        case 'exit':
+            console.log('Exiting CLI...');
+            process.exit(0);
+            break;
+    }
+
+    cliMenu(); // Recursively show the menu again after an action
+}
+
+// Start CLI in the terminal
+cliMenu();  // Start the CLI
