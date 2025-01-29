@@ -7,7 +7,7 @@ const si = require('systeminformation');
 const os = require('os');
 const axios = require('axios');
 const inquirer = require('inquirer');  // Import inquirer for CLI prompts
-const { StartServer, StopServer, showActiveServers } = require("./serverFunctions"); // Import server functions
+const { startServer, stopServer, showActiveServers } = require("./serverFunctions"); // Import server functions
 
 const client = new Client({
     intents: [
@@ -64,10 +64,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.commandName === "start") {
         const serverType = interaction.options.getString("server"); // Get the server type argument
         if (serverType === "arma3") {
-            const result = await StartServer("arma3");  // Call StartServer for Arma 3
+            const result = await startServer("arma3");  // Call StartServer for Arma 3
             await interaction.reply(result);  // Send the result back to Discord
         } else if (serverType === "vintageStory") {
-            const result = await StartServer("vintageStory");  // Call StartServer for Vintage Story
+            const result = await startServer("vintageStory");  // Call StartServer for Vintage Story
             await interaction.reply(result);  // Send the result back to Discord
         }
     }
@@ -95,63 +95,3 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 // Start the bot
 client.login(token);
-
-// CLI Interface using inquirer
-async function cliMenu() {
-    const answer = await inquirer.prompt([
-        {
-            type: 'list',
-            name: 'action',
-            message: 'What would you like to do?',
-            choices: [
-                { name: 'Start Server', value: 'start' },
-                { name: 'Stop Server', value: 'stop' },
-                { name: 'Show Active Servers', value: 'show' },
-                { name: 'Exit', value: 'exit' }
-            ]
-        }
-    ]);
-
-    switch (answer.action) {
-        case 'start':
-            const startAnswers = await inquirer.prompt([
-                {
-                    type: 'list',
-                    name: 'server',
-                    message: 'Which server would you like to start?',
-                    choices: [
-                        { name: 'Arma 3', value: 'arma3' },
-                        { name: 'Vintage Story', value: 'vintageStory' }
-                    ]
-                }
-            ]);
-            await StartServer(startAnswers.server);  // Await the result of starting the selected server
-            break;
-        case 'stop':
-            const stopAnswers = await inquirer.prompt([
-                {
-                    type: 'list',
-                    name: 'server',
-                    message: 'Which server would you like to stop?',
-                    choices: [
-                        { name: 'Arma 3', value: 'arma3' },
-                        { name: 'Vintage Story', value: 'vintageStory' }
-                    ]
-                }
-            ]);
-            await StopServer(stopAnswers.server);  // Await the result of stopping the selected server
-            break;
-        case 'show':
-            await showActiveServers();  // Await the result of showing active servers
-            break;
-        case 'exit':
-            console.log('Exiting CLI...');
-            process.exit(0);
-            break;
-    }
-
-    cliMenu(); // Recursively show the menu again after an action
-}
-
-// Start CLI in the terminal
-cliMenu();  // Start the CLI
