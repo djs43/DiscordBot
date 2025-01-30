@@ -11,8 +11,9 @@ async function startServer(serverName) {
         return `${serverName} server is not configured.`;
     }
 
-    const isServerRunning = await checkIfServerRunning(serverName);
-    if (isServerRunning) {
+    // Check if the server is running by checking its port
+    const pid = await getPIDFromPort(server.port);
+    if (pid) {
         console.log(`${serverName} server is already running.`);
         return `${serverName} server is already running.`;
     }
@@ -31,56 +32,6 @@ async function startServer(serverName) {
 
     return `${serverName} server started successfully.`;
 }
-
-// Generic function to check if a server is running
-async function checkIfServerRunning(serverName) {
-    const server = servers[serverName];
-    if (!server) {
-        console.log(`Server ${serverName} is not configured.`);
-        return false;
-    }
-
-    const runningServers = await getRunningServers();
-    return runningServers.some(server => server.name === server.exeName); // Compare with exeName from config
-}
-
-// Helper function to get running servers
-async function getRunningServers() {
-    console.log("Checking for running server instances...");
-    const runningServers = [];
-
-    // Check all configured servers
-    for (let serverName in servers) {
-        const server = servers[serverName];
-        const serverStatus = await checkServerRunning(server.exeName);
-        if (serverStatus) runningServers.push(serverStatus);
-    }
-
-    return runningServers;
-}
-
-// Helper function to check if a specific server is running
-const checkServerRunning = (exeName) => {
-    return new Promise((resolve, reject) => {
-        exec(`tasklist /FI "IMAGENAME eq ${exeName}" /FO CSV /NH`, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error checking ${exeName} status: ${stderr}`);
-                reject(error);
-            }
-
-            const lines = stdout.trim().split('\n');
-            if (lines.length > 0) {
-                const serverInfo = lines[0].split(',');
-                if (serverInfo.length >= 2) {
-                    const pid = serverInfo[1].replace(/"/g, '').trim();
-                    const name = serverInfo[0].replace(/"/g, '').trim();
-                    resolve({ pid, name });
-                }
-            }
-            resolve(null); // No server found
-        });
-    });
-};
 
 // Generic function to stop any server
 async function stopServer(serverName) {
@@ -104,46 +55,89 @@ async function stopServer(serverName) {
         exec(stopCommand, (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error stopping server with stopPath: ${stderr}`);
-                return `Error stopping the ${serverName} server with stopPath.`;
+                return `Error stopping ${serverName} server with stopPath.`;
             }
             console.log(`Server stopped successfully using stopPath: ${stdout}`);
         });
         return `${serverName} server stopped successfully using stopPath.`;
     } else {
-        // If stopPath doesn't exist, fall back to killing the process using the port
-        console.log(`Executing killProcess.bat for port ${port}`);
-        const killCommand = `"C:\\Optimus\\batFiles\\kill_process.bat" ${port}`; 
+        // If stopPath doesn't exist, use the kill_process.bat to stop by port
+        console.log(`No stopPath found, attempting to stop server by calling kill_process.bat with port ${port}`);
+        
+        const killCommand = `"C:\\Optimus\\batFiles\\kill_process.bat" ${port}`;
+
         exec(killCommand, (error, stdout, stderr) => {
             if (error) {
-                console.error(`Error killing server process for port ${port}: ${stderr}`);
-                return `Error killing the ${serverName} server process for port ${port}.`;
+                console.error(`Error stopping server with kill_process.bat for port ${port}: ${stderr}`);
+                return `Error stopping ${serverName} server with kill_process.bat.`;
             }
-            console.log(`${serverName} server with port ${port} stopped: ${stdout}`);
+            console.log(`Server stopped successfully using kill_process.bat for port ${port}: ${stdout}`);
         });
-        return `${serverName} server stopped successfully by killing process on port ${port}.`;
+
+        return `${serverName} server stopped successfully using kill_process.bat for port ${port}.`;
     }
 }
+
+
+
+// Helper function to find the PID from the port using netstat
+async function getPIDFromPort(port) {
+    return new Promise((resolve, reject) => {
+        exec(`netstat -ano | findstr :${port}`, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error running netstat command: ${stderr || error.message}`);
+                resolve(null); // Resolve with null instead of rejecting
+                return;
+            }
+            if (stderr) {
+                console.error(`stderr: ${stderr}`);
+                resolve(null); // Resolve with null if there's an issue in stderr
+                return;
+            }
+
+            if (stdout) {
+                const pid = stdout.trim().split(/\s+/).pop(); // Get the PID from netstat output
+                resolve(pid);
+            } else {
+                resolve(null); // No process found for the port, resolve with null
+            }
+        });
+    });
+}
+
+
 
 
 // Function to show active servers with PID
 async function showActiveServers() {
-    try {
-        const runningServers = await getRunningServers();
+    const runningServers = []; // This will store active server info
 
-        if (runningServers.length > 0) {
-            console.log("Active servers:");
-            runningServers.forEach(server => {
-                console.log(`PID: ${server.pid}, Name: ${server.name}`);
-            });
-            return runningServers.map(server => `PID: ${server.pid}, Name: ${server.name}`).join('\n');
+    for (let serverName in servers) {
+        const server = servers[serverName];  // Retrieve server object for the current serverName
+        const pid = await getPIDFromPort(server.port);  // Get the PID for the current server's port
+    
+        if (pid === null) {
+            // Log and continue if no server is found for this port
+            console.log(`No active server found on port ${server.port}`);
         } else {
-            console.log("No active servers.");
-            return "No active servers.";
+            // Log if a server is found and add it to runningServers
+            console.log(`Active server is running with PID: ${pid} on port ${server.port}`);
+            runningServers.push({ pid, name: serverName });  // Store active server details
         }
-    } catch (error) {
-        console.error("Error checking active servers:", error);
-        return "Error checking active servers.";
+    }
+
+    if (runningServers.length > 0) {
+        console.log("Active servers:");
+        runningServers.forEach(server => {
+            console.log(`PID: ${server.pid}, Name: ${server.name}`);
+        });
+        // Return a formatted string to Discord with the list of running servers
+        return runningServers.map(server => `PID: ${server.pid}, Name: ${server.name}`).join('\n');
+    } else {
+        console.log("No active servers.");
+        return "No active servers.";  // Return a message if no active servers are found
     }
 }
+
 
 module.exports = { startServer, stopServer, showActiveServers };

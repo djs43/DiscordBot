@@ -1,20 +1,25 @@
 {
-  "token":"your token here",
-  "servers": {
-    "arma3": {
-      "exePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Arma 3\\serverTest.bat",
-      "port":2302
-    },
-    "vintageStory": {
-      "exePath": "C:\\Users\\Dan\\Desktop\\VintageStory\\launchServer.bat",
-      "port":42420
-    },
-    "vintageStoryDanBrute": {
-      "exePath": "C:\\Users\\Dan\\Desktop\\VintageStory\\launchServer.bat",
-      "stopPath":"C:\\Users\\Dan\\Desktop\\VintageStory\\close.bat",
-      "port":42421
-    }
-    }
+  "token":"Your Token Here",
+"servers": {
+  "arma3": {
+    "exePath": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Arma 3\\serverTest.bat",
+    "port":2302
+  },
+  "vintageStory": {
+    "exePath": "C:\\Users\\Dan\\Desktop\\VintageStory\\launchServer.bat",
+    "port":42420
+  },
+  "vintageStoryDanBrute": {
+    "exePath": "C:\\Users\\Dan\\Desktop\\VintageStory\\launchServer.bat",
+    "stopPath":"C:\\Users\\Dan\\Desktop\\VintageStory\\close.bat",
+    "port":42421
+  },
+  "vintageTest": {
+    "exePath": "C:\\Users\\Dan\\Desktop\\VintageStory\\launchServer.bat",
+    "stopPath":"C:\\Users\\Dan\\Desktop\\VintageStory\\close.bat",
+    "port":42422
+  }
+  }
  
 }
 
