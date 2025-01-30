@@ -1,13 +1,7 @@
 const { Client, Events, GatewayIntentBits } = require("discord.js");
-const { token } = require("./config.json");
+const { token, servers } = require("./config.json"); // Ensure servers is properly destructured from config.json
 const { registerCommands } = require("./commands"); // Separate commands module for better structure
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, getVoiceConnection } = require('@discordjs/voice');
-const { exec } = require('child_process');
-const si = require('systeminformation');
-const os = require('os');
-const axios = require('axios');
-const inquirer = require('inquirer');  // Import inquirer for CLI prompts
-const { StartServer, StopServer, showActiveServers } = require("./serverFunctions"); // Import server functions
+const { startServer, stopServer, showActiveServers } = require("./serverFunctions"); // Import server functions
 
 const client = new Client({
     intents: [
@@ -31,9 +25,9 @@ client.once(Events.ClientReady, async () => {
 
     // Update bot status periodically
     setInterval(async () => {
-        const cpuData = await si.currentLoad();
+        const cpuData = await require('systeminformation').currentLoad();
         const cpuUsage = cpuData.currentLoad.toFixed(2);
-        const ramUsage = (os.totalmem() - os.freemem()) / os.totalmem() * 100;
+        const ramUsage = (require('os').totalmem() - require('os').freemem()) / require('os').totalmem() * 100;
 
         const statusMessage = `CPU: ${cpuUsage}% | RAM: ${ramUsage.toFixed(2)}%`;
         client.user.setPresence({ activities: [{ name: statusMessage }] });
@@ -45,13 +39,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isCommand()) return;
 
     const voiceChannel = interaction.member.voice.channel;
+
     if (interaction.commandName === "ping") {
         return interaction.reply("Pong!");
     }
 
     if (interaction.commandName === 'ip') {
         try {
-            // Fetch public IP using ipify API
+            const axios = require('axios');
             const response = await axios.get('https://api.ipify.org?format=json');
             const publicIP = response.data.ip;
             await interaction.reply(`Current IP address is: ${publicIP}`);
@@ -61,26 +56,25 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
     }
 
+    // Start server dynamically based on config.json
     if (interaction.commandName === "start") {
         const serverType = interaction.options.getString("server"); // Get the server type argument
-        if (serverType === "arma3") {
-            const result = await StartServer("arma3");  // Call StartServer for Arma 3
+        if (servers[serverType]) {
+            const result = await startServer(serverType);  // Call StartServer dynamically
             await interaction.reply(result);  // Send the result back to Discord
-        } else if (serverType === "vintageStory") {
-            const result = await StartServer("vintageStory");  // Call StartServer for Vintage Story
-            await interaction.reply(result);  // Send the result back to Discord
+        } else {
+            await interaction.reply("That server is not configured.");
         }
     }
 
-    // Stop server
+    // Stop server dynamically based on config.json
     if (interaction.commandName === "stop") {
         const serverType = interaction.options.getString("server"); // Get the server type argument
-        if (serverType === "arma3") {
-            const result = await StopServer("arma3");  // Call StopServer for Arma 3
+        if (servers[serverType]) {
+            const result = await stopServer(serverType);  // Call StopServer dynamically
             await interaction.reply(result);  // Send the result back to Discord
-        } else if (serverType === "vintageStory") {
-            const result = await StopServer("vintageStory");  // Call StopServer for Vintage Story
-            await interaction.reply(result);  // Send the result back to Discord
+        } else {
+            await interaction.reply("That server is not configured.");
         }
     }
 
@@ -89,69 +83,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const result = await showActiveServers();  // Call showActiveServers from serverFunctions.js
         await interaction.reply(result);  // Send the result back to Discord
     }
-
-    
 });
 
 // Start the bot
 client.login(token);
-
-// CLI Interface using inquirer
-async function cliMenu() {
-    const answer = await inquirer.prompt([
-        {
-            type: 'list',
-            name: 'action',
-            message: 'What would you like to do?',
-            choices: [
-                { name: 'Start Server', value: 'start' },
-                { name: 'Stop Server', value: 'stop' },
-                { name: 'Show Active Servers', value: 'show' },
-                { name: 'Exit', value: 'exit' }
-            ]
-        }
-    ]);
-
-    switch (answer.action) {
-        case 'start':
-            const startAnswers = await inquirer.prompt([
-                {
-                    type: 'list',
-                    name: 'server',
-                    message: 'Which server would you like to start?',
-                    choices: [
-                        { name: 'Arma 3', value: 'arma3' },
-                        { name: 'Vintage Story', value: 'vintageStory' }
-                    ]
-                }
-            ]);
-            await StartServer(startAnswers.server);  // Await the result of starting the selected server
-            break;
-        case 'stop':
-            const stopAnswers = await inquirer.prompt([
-                {
-                    type: 'list',
-                    name: 'server',
-                    message: 'Which server would you like to stop?',
-                    choices: [
-                        { name: 'Arma 3', value: 'arma3' },
-                        { name: 'Vintage Story', value: 'vintageStory' }
-                    ]
-                }
-            ]);
-            await StopServer(stopAnswers.server);  // Await the result of stopping the selected server
-            break;
-        case 'show':
-            await showActiveServers();  // Await the result of showing active servers
-            break;
-        case 'exit':
-            console.log('Exiting CLI...');
-            process.exit(0);
-            break;
-    }
-
-    cliMenu(); // Recursively show the menu again after an action
-}
-
-// Start CLI in the terminal
-cliMenu();  // Start the CLI
