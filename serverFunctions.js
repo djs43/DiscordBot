@@ -1,5 +1,6 @@
 const { exec } = require('child_process');
 const { servers } = require("./config.json"); // Load servers config
+const axios = require('axios');
 
 let activeServers = {}; // To store running servers by PID
 
@@ -139,5 +140,32 @@ async function showActiveServers() {
     }
 }
 
+async function getPublicIP() {
+    try {
+        const response = await axios.get('https://api.ipify.org?format=json'); // Request public IP
+        return response.data.ip;  // Return the public IP
+    } catch (error) {
+        console.error('Error fetching public IP:', error);
+        return 'Unable to fetch public IP';  // Fallback in case of error
+    }
+}
 
-module.exports = { startServer, stopServer, showActiveServers };
+// Function to get server info (now using public IP)
+async function serverInfo() {
+    const publicIP = await getPublicIP(); // Get public IP address
+
+    let infoText = ''; // This will accumulate the formatted server information
+
+    for (let serverName in servers) {
+        const server = servers[serverName];  // Retrieve server object for the current serverName
+        const ipPort = `${publicIP}:${server.port}`;  // Format as Public IP:Port
+        const info = server.info || "No additional information";  // Get the info field (default if not present)
+
+        // Format the information for this server
+        infoText += `**${serverName}**: ${ipPort}\n${info}\n\n`;
+    }
+
+    return infoText; // Return the formatted string
+}
+
+module.exports = { startServer, stopServer, showActiveServers, serverInfo, getPublicIP };

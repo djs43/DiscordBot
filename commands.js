@@ -41,6 +41,9 @@ module.exports = {
             new SlashCommandBuilder()
                 .setName('ip')
                 .setDescription('Shows your public IP address'),
+            new SlashCommandBuilder()
+                .setName('serverinfo')
+                .setDescription('Shows your public IP address'),    
         ];
 
         // Register commands to the specific guild
