@@ -76,10 +76,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.commandName === "stop") {
         const serverType = interaction.options.getString("server"); // Get the server type argument
         if (serverType === "arma3") {
-            const result = await StopServer("arma3");  // Call StopServer for Arma 3
+            const result = await stopServer("arma3");  // Call StopServer for Arma 3
             await interaction.reply(result);  // Send the result back to Discord
         } else if (serverType === "vintageStory") {
-            const result = await StopServer("vintageStory");  // Call StopServer for Vintage Story
+            const result = await stopServer("vintageStory");  // Call StopServer for Vintage Story
             await interaction.reply(result);  // Send the result back to Discord
         }
     }

@@ -112,7 +112,7 @@ async function stopServer(serverName) {
     } else {
         // If stopPath doesn't exist, fall back to killing the process using the port
         console.log(`Executing killProcess.bat for port ${port}`);
-        const killCommand = `"C:\\Optimus\\batFiles\\killProcess.bat" ${port}`; 
+        const killCommand = `"C:\\Optimus\\batFiles\\kill_process.bat" ${port}`; 
         exec(killCommand, (error, stdout, stderr) => {
             if (error) {
                 console.error(`Error killing server process for port ${port}: ${stderr}`);
