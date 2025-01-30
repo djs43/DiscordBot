@@ -1,7 +1,7 @@
 const { Client, Events, GatewayIntentBits } = require("discord.js");
 const { token, servers } = require("./config.json"); // Ensure servers is properly destructured from config.json
 const { registerCommands } = require("./commands"); // Separate commands module for better structure
-const { startServer, stopServer, showActiveServers } = require("./serverFunctions"); // Import server functions
+const { startServer, stopServer, showActiveServers, serverInfo, getPublicIP } = require("./serverFunctions"); // Import server functions
 
 const client = new Client({
     intents: [
@@ -46,10 +46,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     if (interaction.commandName === 'ip') {
         try {
-            const axios = require('axios');
-            const response = await axios.get('https://api.ipify.org?format=json');
-            const publicIP = response.data.ip;
-            await interaction.reply(`Current IP address is: ${publicIP}`);
+            const publicIP = await getPublicIP();  // Use getPublicIP function
+            await interaction.reply(`Current IP address is: ${publicIP}`);  // Send IP address to the user
         } catch (error) {
             console.error("Error fetching public IP:", error);
             await interaction.reply("There was an error fetching the IP.");
@@ -82,6 +80,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.commandName === "showactive") {
         const result = await showActiveServers();  // Call showActiveServers from serverFunctions.js
         await interaction.reply(result);  // Send the result back to Discord
+    }
+    if (interaction.commandName === "serverinfo") {
+        const serverDetails = await serverInfo(); // Get the server info with public IP
+        await interaction.reply(serverDetails); // Send the result back to Discord
     }
 });
 
