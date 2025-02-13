@@ -5,6 +5,7 @@ module.exports = {
     registerCommands: async function(client) {
         const guildId = "929092597505462362"; // Replace with your actual Guild ID
 
+        // Start with the basic commands
         const commands = [
             new SlashCommandBuilder().setName('ping').setDescription('Replies with pong'),
             new SlashCommandBuilder()
@@ -43,8 +44,31 @@ module.exports = {
                 .setDescription('Shows your public IP address'),
             new SlashCommandBuilder()
                 .setName('serverinfo')
-                .setDescription('Shows your public IP address'),    
+                .setDescription('Shows your public IP address'),
         ];
+
+        // Add 'update' command dynamically for servers that have updateBatPath
+        Object.keys(servers).forEach(serverName => {
+            const server = servers[serverName];
+            if (server.updateBatPath) {
+                commands.push(
+                    new SlashCommandBuilder()
+                        .setName('update')
+                        .setDescription(`Updates the ${serverName} server`)
+                        .addStringOption(option =>
+                            option.setName('server')
+                                .setDescription('The type of server to update')
+                                .setRequired(true)
+                                .addChoices(
+                                    {
+                                        name: serverName.charAt(0).toUpperCase() + serverName.slice(1),
+                                        value: serverName
+                                    }
+                                )
+                        )
+                );
+            }
+        });
 
         // Register commands to the specific guild
         try {

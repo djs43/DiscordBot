@@ -2,6 +2,7 @@ const { Client, Events, GatewayIntentBits } = require("discord.js");
 const { token, servers } = require("./config.json"); // Ensure servers is properly destructured from config.json
 const { registerCommands } = require("./commands"); // Separate commands module for better structure
 const { startServer, stopServer, showActiveServers, serverInfo, getPublicIP } = require("./serverFunctions"); // Import server functions
+const { exec } = require('child_process'); // For executing the batch files
 
 const client = new Client({
     intents: [
@@ -81,9 +82,38 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const result = await showActiveServers();  // Call showActiveServers from serverFunctions.js
         await interaction.reply(result);  // Send the result back to Discord
     }
+
     if (interaction.commandName === "serverinfo") {
         const serverDetails = await serverInfo(); // Get the server info with public IP
         await interaction.reply(serverDetails); // Send the result back to Discord
+    }
+
+    // Handle the 'update' command
+    if (interaction.commandName === "update") {
+        const serverType = interaction.options.getString("server"); // Get the server type argument
+        
+        if (servers[serverType]) {
+            const server = servers[serverType];
+
+            // Check if the server has an 'updateBatPath' in its configuration
+            if (server.updateBatPath) {
+                console.log(`Running update script for ${serverType} using ${server.updateBatPath}`);
+
+                // Execute the update command (the path to the update batch file)
+                exec(`"${server.updateBatPath}"`, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`Error updating server: ${stderr}`);
+                        return interaction.reply(`Failed to update the ${serverType} server.`);
+                    }
+                    console.log(`${serverType} attempting to update: ${stdout}`);
+                    return interaction.reply(`attempting to update ${serverType} server. Check to see if the server started in a few minutes`);
+                });
+            } else {
+                await interaction.reply(`No update script found for the ${serverType} server.`);
+            }
+        } else {
+            await interaction.reply("That server is not configured.");
+        }
     }
 });
 

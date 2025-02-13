@@ -34,6 +34,36 @@ async function startServer(serverName) {
     return `${serverName} server started successfully.`;
 }
 
+// Function to update the server using the update.bat from the JSON config
+async function update(serverName) {
+    const server = servers[serverName];
+    if (!server) {
+        console.log(`Server ${serverName} is not configured.`);
+        return `${serverName} server is not configured.`;
+    }
+
+    // Check if an update.bat file path is provided in the config
+    const updateBatPath = server.updateBatPath;
+    if (!updateBatPath) {
+        console.log(`No update.bat file path configured for ${serverName}.`);
+        return `No update.bat file path configured for ${serverName}.`;
+    }
+
+    console.log(`Running update for ${serverName} with command: ${updateBatPath}`);
+
+    // Execute the update.bat file
+    exec(`"${updateBatPath}"`, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error during update: ${stderr}`);
+            return `Error updating ${serverName} server.`;
+        }
+        console.log(`Update completed for ${serverName}: ${stdout}`);
+    });
+
+    return `${serverName} server update initiated.`;
+}
+
+
 // Generic function to stop any server
 async function stopServer(serverName) {
     console.log(`Stopping ${serverName} server...`);
@@ -65,7 +95,7 @@ async function stopServer(serverName) {
         // If stopPath doesn't exist, use the kill_process.bat to stop by port
         console.log(`No stopPath found, attempting to stop server by calling kill_process.bat with port ${port}`);
         
-        const killCommand = `"C:\\Optimus\\batFiles\\kill_process.bat" ${port}`;
+        const killCommand = `"${__dirname}/batFiles/kill_process.bat" ${port}`;
 
         exec(killCommand, (error, stdout, stderr) => {
             if (error) {
@@ -75,7 +105,7 @@ async function stopServer(serverName) {
             console.log(`Server stopped successfully using kill_process.bat for port ${port}: ${stdout}`);
         });
 
-        return `${serverName} server stopped successfully using kill_process.bat for port ${port}.`;
+        return `${serverName} attempting to stop server ${port}.`;
     }
 }
 
@@ -168,4 +198,4 @@ async function serverInfo() {
     return infoText; // Return the formatted string
 }
 
-module.exports = { startServer, stopServer, showActiveServers, serverInfo, getPublicIP };
+module.exports = { startServer, stopServer, showActiveServers, serverInfo, getPublicIP, update};
